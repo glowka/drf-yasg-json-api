@@ -22,8 +22,8 @@ from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_queryset
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from docs.utils import get_related_model
-from docs.utils import is_json_api_response
+from .utils import get_related_model
+from .utils import is_json_api_response
 
 logger = logging.getLogger(__name__)
 

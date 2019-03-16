@@ -8,7 +8,7 @@ from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from docs.utils import is_json_api_response
+from .utils import is_json_api_response
 
 
 class SwaggerJSONAPISchema(SwaggerAutoSchema):
