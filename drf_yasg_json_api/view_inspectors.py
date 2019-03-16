@@ -15,13 +15,16 @@ class SwaggerJSONAPISchema(SwaggerAutoSchema):
 
     def get_request_body_schema(self, serializer):
         schema = super().get_request_body_schema(serializer)
-        if schema is not None:
-            return openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties=OrderedDict({
-                    'data': schema,
-                })
-            )
+        # TODO: check for parser in this case
+        if is_json_api_response(self.get_renderer_classes()):
+            if schema is not None:
+                schema = openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties=OrderedDict({
+                        'data': schema,
+                    })
+                )
+        return schema
 
     def get_default_responses(self):
         if not is_json_api_response(self.get_renderer_classes()):

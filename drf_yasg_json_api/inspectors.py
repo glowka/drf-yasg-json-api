@@ -1,3 +1,4 @@
+import copy
 import logging
 from collections import OrderedDict
 
@@ -44,7 +45,9 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
 
         return SwaggerType(
             type=openapi.TYPE_OBJECT,
-            properties=self.build_json_resource_obj(field, resource_name, SwaggerType, ChildSwaggerType, use_references)
+            properties=self.build_json_resource_obj(field, resource_name,
+                                                    SwaggerType, ChildSwaggerType, use_references),
+            required=['id', 'type']
         )
 
     def build_json_resource_obj(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references):
@@ -56,14 +59,18 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
             ))
 
-        attributes = self.extract_attributes(fields, ChildSwaggerType, use_references)
-        relationships = self.extract_relationships(fields, ChildSwaggerType, use_references)
+        attributes, required_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references)
+        relationships, required_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references)
 
         resource_data = [
             ('type', SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name)),
-            ('id', self.probe_field_inspectors(id_, ChildSwaggerType, use_references)) if id_ else ('id', None),
-            ('attributes', SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes) if attributes else None),
-            ('relationships', SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships)
+            ('id', self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
+                if id_ else None),
+            ('attributes', SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
+                                       required=required_attributes or None)
+                if attributes else None),
+            ('relationships', SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships,
+                                          required=required_relationships or None)
                 if relationships else None),
         ]
 
@@ -71,26 +78,24 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
 
     def extract_attributes(self, fields, ChildSwaggerType, use_references):
         attrs = {}
+        required_attrs = []
         for field_name, field in six.iteritems(fields):
             # ID is always provided in the root of JSON API so remove it from attributes
             if field_name == 'id':
-                continue
-            # don't output a key for write only fields
-            if fields[field_name].write_only:
                 continue
             # Skip fields with relations
             if isinstance(field, (relations.RelatedField, relations.ManyRelatedField, BaseSerializer)):
                 continue
 
-            attrs.update({
-                field_name: self.probe_field_inspectors(field, ChildSwaggerType, use_references)
-            })
-
-        return attrs
+            attrs[field_name] = self.probe_field_inspectors(field, ChildSwaggerType, use_references)
+            if field.required and not field.read_only:
+                logger.error(field_name)
+                required_attrs.append(field_name)
+        return attrs, required_attrs
 
     def extract_relationships(self, fields, ChildSwaggerType, use_references):
-        data = OrderedDict()
-
+        relationships = OrderedDict()
+        required_relationships = []
         for field_name, field in six.iteritems(fields):
             many = False
             id_field = field
@@ -141,20 +146,30 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 properties={
                     'type': openapi.Schema(type=openapi.TYPE_STRING, pattern=resource_name),
                     'id': swagger_id_field
-                }
+                },
+                required=['id', 'type'],
             )
 
             if many:
                 relation_record = openapi.Schema(type=openapi.TYPE_ARRAY, items=relation_record)
 
-            data[field_name] = openapi.Schema(
+            relationships[field_name] = openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
                     'data': relation_record
                 }
             )
+            if field.required and not field.read_only:
+                required_relationships.append(field_name)
 
-        return data
+        return relationships, required_relationships
+
+    def inline_serializer_from_fields(self, fields_dict, sub_serializer=True):
+        attrs = {f_name: copy.deepcopy(field) for f_name, field in six.iteritems(fields_dict)}
+        serializer = type('Attributes', (serializers.Serializer,), attrs)()
+        if sub_serializer:
+            serializer.bind(field_name='', parent=serializers.Serializer())
+        return serializer
 
     def is_json_api(self, field):
         return field and field.parent is None and is_json_api_response(self.view.renderer_classes)
@@ -258,10 +273,9 @@ class AttributesEnhancingFilter(inspectors.FieldInspector):
             setattr(result, 'read_only', True)
 
     def process_result(self, result, method_name, obj, **kwargs):
-
-        self.add_write_only(result, obj)
-        self.fix_read_only(result, obj)
-
+        if result is not None:
+            self.add_write_only(result, obj)
+            self.fix_read_only(result, obj)
         return result
 
 
