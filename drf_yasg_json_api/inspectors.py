@@ -10,7 +10,6 @@ from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.inspectors.field import get_model_field
 from drf_yasg.inspectors.field import get_parent_serializer
-from drf_yasg.inspectors.field import get_queryset_field
 from drf_yasg.utils import filter_none
 from rest_framework import relations
 from rest_framework import serializers
@@ -20,7 +19,6 @@ from rest_framework_json_api import utils as json_api_utils
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
-from rest_framework_json_api.utils import get_resource_type_from_queryset
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
 from .utils import get_related_model
@@ -43,14 +41,9 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
         resource_name = get_resource_type_from_serializer(field) if included \
             else get_resource_name(context={'view': self.view})
 
-        return SwaggerType(
-            type=openapi.TYPE_OBJECT,
-            properties=self.build_json_resource_obj(field, resource_name,
-                                                    SwaggerType, ChildSwaggerType, use_references),
-            required=['id', 'type']
-        )
+        return self.build_json_resource_schema(field, resource_name, SwaggerType, ChildSwaggerType, use_references)
 
-    def build_json_resource_obj(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references):
+    def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references):
         fields = json_api_utils.get_serializer_fields(serializer)
 
         id_ = fields.get('id')
@@ -61,20 +54,27 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
 
         attributes, required_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references)
         relationships, required_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references)
+        links = self.extract_links(fields, ChildSwaggerType, use_references)
 
-        resource_data = [
-            ('type', SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name)),
-            ('id', self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
-                if id_ else None),
-            ('attributes', SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
-                                       required=required_attributes or None)
-                if attributes else None),
-            ('relationships', SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships,
-                                          required=required_relationships or None)
-                if relationships else None),
-        ]
+        schema_fields = filter_none(OrderedDict(
+            type=SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name),
+            id=self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
+            if id_ else None,
+            attributes=SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
+                                   required=required_attributes or None)
+            if attributes else None,
+            relationships=SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships,
+                                      required=required_relationships or None)
+            if relationships else None,
+            links=SwaggerType(type=openapi.TYPE_OBJECT, properties=links)
+            if links else None
+        ))
 
-        return filter_none(OrderedDict(resource_data))
+        return SwaggerType(
+            type=openapi.TYPE_OBJECT,
+            properties=schema_fields,
+            required=['id', 'type'] if 'id' in schema_fields else ['type']
+        )
 
     def extract_attributes(self, fields, ChildSwaggerType, use_references):
         attrs = {}
@@ -89,7 +89,6 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
 
             attrs[field_name] = self.probe_field_inspectors(field, ChildSwaggerType, use_references)
             if field.required and not field.read_only:
-                logger.error(field_name)
                 required_attrs.append(field_name)
         return attrs, required_attrs
 
@@ -99,7 +98,9 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
         for field_name, field in six.iteritems(fields):
             many = False
             id_field = field
+            parent_serializer = get_parent_serializer(id_field)
 
+            # Self url field
             if field_name == api_settings.URL_FIELD_NAME:
                 continue
 
@@ -111,16 +112,14 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 id_field = id_field.child_relation
                 many = True
 
-            target_field = getattr(id_field, 'slug_field', 'pk')
-
             # Get model
-            if hasattr('id_field', 'get_queryset'):
-                field_queryset = get_resource_type_from_queryset(id_field.get_queryset())
-                model, model_field = get_queryset_field(field_queryset, target_field)
-            else:
-                # if the RelatedField has a queryset, try to get the related model field from there
-                parent_serializer = get_parent_serializer(id_field)
+            if hasattr(id_field, 'model'):
+                model = id_field.model
+            elif hasattr(id_field, 'get_queryset') and id_field.get_queryset():
+                model = id_field.get_queryset().model
 
+            # If the RelatedField hasn't got a queryset, take model from the serializer and find proper model field
+            else:
                 serializer_meta = getattr(parent_serializer, 'Meta', None)
                 this_model = getattr(serializer_meta, 'model', None)
 
@@ -129,6 +128,8 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                     source = getattr(id_field.parent, 'source', '') or id_field.parent.field_name
 
                 model = get_related_model(this_model, source)
+
+            assert model is not None, f"Unable to extract model from {parent_serializer}.{field_name} serializer field"
 
             # Resource name from model
             resource_name = get_resource_type_from_model(model)
@@ -141,28 +142,38 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
             else:
                 swagger_id_field = self.probe_field_inspectors(id_field, ChildSwaggerType, use_references)
 
-            relation_record = openapi.Schema(
+            relation_record = openapi.Schema(**filter_none(OrderedDict(
                 type=openapi.TYPE_OBJECT,
                 properties={
                     'type': openapi.Schema(type=openapi.TYPE_STRING, pattern=resource_name),
                     'id': swagger_id_field
                 },
-                required=['id', 'type'],
-            )
+                required=['id', 'type'] if not field.read_only else None,
+            )))
 
             if many:
                 relation_record = openapi.Schema(type=openapi.TYPE_ARRAY, items=relation_record)
 
-            relationships[field_name] = openapi.Schema(
+            relationships[field_name] = openapi.Schema(**filter_none(OrderedDict(
                 type=openapi.TYPE_OBJECT,
                 properties={
                     'data': relation_record
-                }
-            )
+                },
+                read_only=field.read_only or None,
+                x_read_only=field.read_only or None,
+            )))
             if field.required and not field.read_only:
                 required_relationships.append(field_name)
 
         return relationships, required_relationships
+
+    def extract_links(self, fields, ChildSwaggerType, use_references):
+        self_field_name = api_settings.URL_FIELD_NAME
+
+        return filter_none(OrderedDict(
+            self=openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI)
+            if self_field_name in fields and isinstance(fields[self_field_name], serializers.RelatedField) else None
+        ))
 
     def inline_serializer_from_fields(self, fields_dict, sub_serializer=True):
         attrs = {f_name: copy.deepcopy(field) for f_name, field in six.iteritems(fields_dict)}
@@ -198,7 +209,6 @@ class JSONAPIM2MFieldInspector(inspectors.SimpleFieldInspector):
         model_field = get_model_field(field_model, 'pk')
 
         if isinstance(model_field, (models.IntegerField, models.AutoField)):
-
             SwaggerType, ChildSwaggerType = self._get_partial_types(field, **kwargs)
             return SwaggerType(type=openapi.TYPE_STRING, format=openapi.FORMAT_INT32)
 
@@ -225,7 +235,6 @@ class JSONAPIIDFieldInspector(inspectors.SimpleFieldInspector):
 
         if (isinstance(model_field, models.IntegerField) and model_field.primary_key) or \
                 isinstance(model_field, models.AutoField):
-
             SwaggerType, ChildSwaggerType = self._get_partial_types(field, **kwargs)
             return SwaggerType(type=openapi.TYPE_STRING, format=openapi.FORMAT_INT32)
 
@@ -264,13 +273,16 @@ class AttributesEnhancingFilter(inspectors.FieldInspector):
 
     def add_write_only(self, result, obj):
         if obj.write_only:
-            setattr(result, 'x-write_only', True)
+            result.x_write_only = True
 
     def fix_read_only(self, result, obj):
         # drf_yasg is very cautious about setting read_only, only leaves are allowed to be read only,
         # but in some cases it misbehaves and obvious leaf cases are omitted too, so we fix this
         if result.type in (openapi.TYPE_STRING, openapi.TYPE_INTEGER, openapi.TYPE_BOOLEAN) and obj.read_only:
-            setattr(result, 'read_only', True)
+            result.read_only = True
+        elif obj.read_only:
+            # in other cases make read only visible by adding x prefix to avoid conflict with OpenApi 2 validation
+            result.x_read_only = True
 
     def process_result(self, result, method_name, obj, **kwargs):
         if result is not None:
