@@ -8,21 +8,22 @@ from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from docs.utils import is_json_api_response, is_json_api_request
+from .utils import is_json_api_response, is_json_api_request
 
 
 class SwaggerJSONAPISchema(SwaggerAutoSchema):
 
     def get_request_body_schema(self, serializer):
-        schema = super().get_request_body_schema(serializer)
+        schema = self.serializer_to_request_schema(serializer)
         if is_json_api_request(self.get_parser_classes()):
             if schema is not None:
-                return openapi.Schema(
+                schema = openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties=OrderedDict({
                         'data': schema,
                     })
                 )
+        return schema
 
     def get_default_responses(self):
         if not is_json_api_response(self.get_renderer_classes()):
@@ -63,13 +64,18 @@ class SwaggerJSONAPISchema(SwaggerAutoSchema):
         return openapi.Schema(
             type=openapi.TYPE_OBJECT,
             description='note: expect this field to be an array consisting of items of types listed below',
-            properties={get_resource_type_from_serializer(serializer): self.serializer_to_schema_included(serializer())
+            properties={get_resource_type_from_serializer(serializer): self.serializer_to_included_schema(serializer())
                         for i, serializer in enumerate(included_serializers)}
         )
 
-    def serializer_to_schema_included(self, serializer):
+    def serializer_to_included_schema(self, serializer):
         return self.probe_inspectors(
-            self.field_inspectors, 'get_schema_included', serializer, {'field_inspectors': self.field_inspectors}
+            self.field_inspectors, 'get_included_schema', serializer, {'field_inspectors': self.field_inspectors}
+        )
+
+    def serializer_to_request_schema(self, serializer):
+        return self.probe_inspectors(
+            self.field_inspectors, 'get_request_schema', serializer, {'field_inspectors': self.field_inspectors},
         )
 
     def get_query_parameters(self):

@@ -21,7 +21,7 @@ from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from .utils import get_related_model
+from .utils import get_related_model, is_json_api_request
 from .utils import is_json_api_response
 
 logger = logging.getLogger(__name__)
@@ -29,21 +29,30 @@ logger = logging.getLogger(__name__)
 
 class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
 
-    def get_schema_included(self, serializer):
+    def get_schema(self, serializer):
+        return self.probe_field_inspectors(serializer, openapi.Schema, self.use_definitions, is_request=False)
+
+    def get_request_schema(self, serializer):
+        return self.probe_field_inspectors(serializer, openapi.Schema, self.use_definitions, is_request=True)
+
+    def get_included_schema(self, serializer):
         return self.probe_field_inspectors(serializer, openapi.Schema, self.use_definitions, included=True)
 
-    def field_to_swagger_object(self, field, swagger_object_type, use_references, included=False, **kwargs):
-        if not self.is_json_api(field):
-            return inspectors.NotHandled
+    def field_to_swagger_object(self, field, swagger_object_type, use_references, included=False, is_request=None,
+                                **kwargs):
+        if not self.is_json_api_root_serializer(field, is_request):
+            return super().field_to_swagger_object(field, swagger_object_type, use_references, **kwargs)
 
         SwaggerType, ChildSwaggerType = self._get_partial_types(field, swagger_object_type, use_references, **kwargs)
 
         resource_name = get_resource_type_from_serializer(field) if included \
             else get_resource_name(context={'view': self.view})
 
-        return self.build_json_resource_schema(field, resource_name, SwaggerType, ChildSwaggerType, use_references)
+        return self.build_json_resource_schema(field, resource_name, SwaggerType, ChildSwaggerType, use_references,
+                                               is_request)
 
-    def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references):
+    def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references,
+                                   is_request=None):
         fields = json_api_utils.get_serializer_fields(serializer)
 
         id_ = fields.get('id')
@@ -52,34 +61,42 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
             ))
 
-        attributes, required_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references)
-        relationships, required_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references)
-        links = self.extract_links(fields, ChildSwaggerType, use_references)
+        attributes, req_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references, is_request)
+        relationships, req_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references,
+                                                                      is_request)
+        links = self.extract_links(fields, ChildSwaggerType, use_references) if not is_request else None
 
         schema_fields = filter_none(OrderedDict(
             type=SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name),
             id=self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
             if id_ else None,
             attributes=SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
-                                   required=required_attributes or None)
+                                   required=req_attributes)
             if attributes else None,
             relationships=SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships,
-                                      required=required_relationships or None)
+                                      required=req_relationships)
             if relationships else None,
             links=SwaggerType(type=openapi.TYPE_OBJECT, properties=links)
             if links else None
         ))
 
+        if is_request is None or is_request:
+            required_properties = ['id', 'type'] if 'id' in schema_fields else ['type']
+        else:
+            required_properties = None
+
         return SwaggerType(
             type=openapi.TYPE_OBJECT,
             properties=schema_fields,
-            required=['id', 'type'] if 'id' in schema_fields else ['type']
+            required=required_properties
         )
 
-    def extract_attributes(self, fields, ChildSwaggerType, use_references):
+    def extract_attributes(self, fields, ChildSwaggerType, use_references, is_request=None):
         attrs = {}
         required_attrs = []
         for field_name, field in six.iteritems(fields):
+            if is_request and field.read_only:
+                continue
             # ID is always provided in the root of JSON API so remove it from attributes
             if field_name == 'id':
                 continue
@@ -88,17 +105,20 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 continue
 
             attrs[field_name] = self.probe_field_inspectors(field, ChildSwaggerType, use_references)
-            if field.required and not field.read_only:
+            if is_request is None or is_request and field.required and not field.read_only:
                 required_attrs.append(field_name)
-        return attrs, required_attrs
+        return attrs, (required_attrs or None)
 
-    def extract_relationships(self, fields, ChildSwaggerType, use_references):
+    def extract_relationships(self, fields, ChildSwaggerType, use_references, is_request=None):
         relationships = OrderedDict()
         required_relationships = []
         for field_name, field in six.iteritems(fields):
             many = False
             id_field = field
             parent_serializer = get_parent_serializer(id_field)
+
+            if is_request and field.read_only:
+                continue
 
             # Self url field
             if field_name == api_settings.URL_FIELD_NAME:
@@ -148,7 +168,7 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                     'type': openapi.Schema(type=openapi.TYPE_STRING, pattern=resource_name),
                     'id': swagger_id_field
                 },
-                required=['id', 'type'] if not field.read_only else None,
+                required=['id', 'type'] if (is_request is None or is_request) and not field.read_only else None,
             )))
 
             if many:
@@ -162,10 +182,10 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
                 read_only=field.read_only or None,
                 x_read_only=field.read_only or None,
             )))
-            if field.required and not field.read_only:
+            if (is_request is None or is_request) and field.required and not field.read_only:
                 required_relationships.append(field_name)
 
-        return relationships, required_relationships
+        return relationships, (required_relationships or None)
 
     def extract_links(self, fields, ChildSwaggerType, use_references):
         self_field_name = api_settings.URL_FIELD_NAME
@@ -182,8 +202,11 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
             serializer.bind(field_name='', parent=serializers.Serializer())
         return serializer
 
-    def is_json_api(self, field):
-        return field and field.parent is None and is_json_api_response(self.view.renderer_classes)
+    def is_json_api_root_serializer(self, field, is_request=False):
+        return field and field.parent is None and (
+            (not is_request and is_json_api_response(self.view.renderer_classes))
+            or ((is_request or is_request is None) and is_json_api_request(self.view.parser_classes))
+        )
 
 
 class JSONAPIM2MFieldInspector(inspectors.SimpleFieldInspector):
