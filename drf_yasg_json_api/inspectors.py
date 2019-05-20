@@ -63,6 +63,8 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
             logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
                 view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
             ))
+        if id_ is not None and id_.read_only and is_request:
+            id_ = None
 
         attributes, req_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references, is_request)
         relationships, req_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references,
