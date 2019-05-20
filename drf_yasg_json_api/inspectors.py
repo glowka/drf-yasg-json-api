@@ -15,6 +15,7 @@ from rest_framework import relations
 from rest_framework import serializers
 from rest_framework.serializers import BaseSerializer
 from rest_framework.settings import api_settings
+from rest_framework_json_api import django_filters
 from rest_framework_json_api import serializers as dja_serializers
 from rest_framework_json_api import utils as json_api_utils
 from rest_framework_json_api.utils import format_value
@@ -367,3 +368,15 @@ class Base64FileFieldInspector(inspectors.FieldInspector):
                 return result
 
         return inspectors.NotHandled
+
+
+class JSONAPIDjangoFilterInspector(inspectors.CoreAPICompatInspector):
+    def get_filter_parameters(self, filter_backend):
+        if not isinstance(filter_backend, django_filters.DjangoFilterBackend):
+            return inspectors.NotHandled
+        return super().get_filter_parameters(filter_backend)
+
+    def coreapi_field_to_parameter(self, field):
+        parameter = super().coreapi_field_to_parameter(field)
+        parameter.name = f'filter[{parameter.name}]'
+        return parameter
