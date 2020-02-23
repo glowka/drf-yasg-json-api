@@ -1,0 +1,4 @@
+include README.rst
+include LICENSE.rst
+include pyproject.toml
+recursive-include requirements *

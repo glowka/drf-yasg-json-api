@@ -2,12 +2,14 @@
 from __future__ import print_function
 
 import io
-from setuptools import find_packages, setup
+
+from setuptools import find_packages
+from setuptools import setup
 
 with io.open('README.rst', encoding='utf-8') as readme:
     description = readme.read()
 
-with open('requirements.txt') as req:
+with open('requirements/base.txt') as req:
     requirements = [line.strip() for line in req.readlines() if line.strip() and not line.strip().startswith('#')]
 
 
@@ -26,7 +28,7 @@ setup(
     author_email='',
     keywords='drf django django-rest-framework schema swagger openapi codegen swagger-codegen '
              'documentation drf-yasg django-rest-swagger drf-openapi json-api',
-    python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
+    python_requires=">=3.5",
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
@@ -34,17 +36,15 @@ setup(
         'Operating System :: OS Independent',
         'Environment :: Web Environment',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Framework :: Django',
-        'Framework :: Django :: 1.11',
         'Framework :: Django :: 2.0',
         'Framework :: Django :: 2.1',
+        'Framework :: Django :: 2.2',
+        'Framework :: Django :: 3.0',
         'Topic :: Documentation',
         'Topic :: Software Development :: Code Generators',
     ],

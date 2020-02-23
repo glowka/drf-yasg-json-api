@@ -1,5 +1,4 @@
-Django>=2.0.0
+django>=2.0.0
 djangorestframework>=3.7.7
-drf-yasg>=1.14.0
 djangorestframework-jsonapi>=2.4.0
-django-extra-fields>=1.0.0
+drf-yasg>=1.14.0

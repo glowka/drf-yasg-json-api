@@ -1,7 +1,7 @@
 import copy
 import logging
-from collections import OrderedDict
 
+from collections import OrderedDict
 
 from django.db import models
 from drf_yasg import inspectors
@@ -97,7 +97,7 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
     def extract_attributes(self, fields, ChildSwaggerType, use_references, is_request=None):
         attrs = {}
         required_attrs = []
-        for field_name, field in six.iteritems(fields):
+        for field_name, field in fields.items():
             if is_request and field.read_only:
                 continue
             # ID is always provided in the root of JSON API so remove it from attributes
@@ -115,7 +115,7 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
     def extract_relationships(self, fields, ChildSwaggerType, use_references, is_request=None):
         relationships = OrderedDict()
         required_relationships = []
-        for field_name, field in six.iteritems(fields):
+        for field_name, field in fields.items():
             many = False
             id_field = field
 
@@ -230,7 +230,7 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
         ))
 
     def inline_serializer_from_fields(self, fields_dict, sub_serializer=True):
-        attrs = {f_name: copy.deepcopy(field) for f_name, field in six.iteritems(fields_dict)}
+        attrs = {f_name: copy.deepcopy(field) for f_name, field in fields_dict.items()}
         serializer = type('Attributes', (serializers.Serializer,), attrs)()
         if sub_serializer:
             serializer.bind(field_name='', parent=serializers.Serializer())
