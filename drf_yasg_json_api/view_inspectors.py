@@ -8,11 +8,11 @@ from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from .utils import is_json_api_response, is_json_api_request
+from .utils import is_json_api_request
+from .utils import is_json_api_response
 
 
 class SwaggerJSONAPISchema(SwaggerAutoSchema):
-
     def get_request_body_schema(self, serializer):
         schema = self.serializer_to_request_schema(serializer)
         if is_json_api_request(self.get_parser_classes()):

@@ -2,10 +2,8 @@ import copy
 import logging
 from collections import OrderedDict
 
+
 from django.db import models
-from django.utils import six
-from drf_extra_fields.fields import Base64FileField
-from drf_extra_fields.fields import Base64ImageField
 from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.inspectors.field import get_model_field
@@ -342,12 +340,13 @@ class AttributesEnhancingFilter(inspectors.FieldInspector):
             result.x_write_only = True
 
     def fix_read_only(self, result, obj):
-        # drf_yasg is very cautious about setting read_only, only leaves are allowed to be read only,
-        # but in some cases it misbehaves and obvious leaf cases are omitted too, so we fix this
+        # drf_yasg is very cautious about setting read_only, only leaf nodes are allowed to be read only,
+        # but in some cases it goes too far and some leaf nodes cases are omitted too.
+        # This workaround fixes obvious cases – types that are always leaf nodes
         if result.type in (openapi.TYPE_STRING, openapi.TYPE_INTEGER, openapi.TYPE_BOOLEAN) and obj.read_only:
             result.read_only = True
+        # For non-leaf nodes make read only visible by adding x prefix to avoid conflict with OpenApi 2 validation
         elif obj.read_only:
-            # in other cases make read only visible by adding x prefix to avoid conflict with OpenApi 2 validation
             result.x_read_only = True
 
     def process_result(self, result, method_name, obj, **kwargs):
@@ -355,21 +354,6 @@ class AttributesEnhancingFilter(inspectors.FieldInspector):
             self.add_write_only(result, obj)
             self.fix_read_only(result, obj)
         return result
-
-
-class Base64FileFieldInspector(inspectors.FieldInspector):
-    """Provides conversions for ``FileField``\\ s."""
-
-    def field_to_swagger_object(self, field, swagger_object_type, use_references, **kwargs):
-        SwaggerType, ChildSwaggerType = self._get_partial_types(field, swagger_object_type, use_references, **kwargs)
-
-        if isinstance(field, (Base64ImageField, Base64FileField)):
-            if swagger_object_type == openapi.Schema:
-                # FileField.to_representation returns URL or file name
-                result = SwaggerType(type=openapi.TYPE_STRING, format=openapi.FORMAT_BASE64)
-                return result
-
-        return inspectors.NotHandled
 
 
 class JSONAPIDjangoFilterInspector(inspectors.CoreAPICompatInspector):

@@ -18,7 +18,7 @@ setup(
     install_requires=requirements,
     extras_require={},
     license='BSD License',
-    description='Automated generation of real Swagger/OpenAPI 2.0 schemas forJSON API Django Rest Framework '
+    description='Automated generation of real Swagger/OpenAPI 2.0 schemas for JSON API Django Rest Framework '
                 'endpoints.',
     long_description=description,
     url='https://github.com/name/drf-yasg-json-api',
