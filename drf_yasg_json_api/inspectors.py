@@ -2,6 +2,7 @@ import copy
 import logging
 
 from collections import OrderedDict
+from typing import Type
 
 from django.db import models
 from drf_yasg import inspectors
@@ -55,14 +56,17 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
     def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references,
                                    is_request=None):
         fields = json_api_utils.get_serializer_fields(serializer)
-
-        id_ = fields.get('id')
-        if id_ is None and self.method.lower() == 'get':
-            logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
-                view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
-            ))
-        if id_ is not None and id_.read_only and is_request:
+        if self.method.lower() == 'post' and is_request:
             id_ = None
+        else:
+            id_ = fields.get('id')
+            if id_ is None and isinstance(serializer, serializers.ModelSerializer):
+                id_ = self.build_id_from_model_pk(serializer)
+
+            if id_ is None:
+                logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
+                    view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
+                ))
 
         attributes, req_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references, is_request)
         relationships, req_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references,
@@ -93,6 +97,13 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
             properties=schema_fields,
             required=required_properties
         )
+
+    def build_id_from_model_pk(self, serializer: serializers.ModelSerializer):
+        field_mapping = serializers.ClassLookupDict(serializers.ModelSerializer.serializer_field_mapping)
+        model_class: Type[models.Model] = serializer.Meta.model
+        pk_model_field = [f for f in model_class._meta.fields if f.primary_key][0]
+        pk_serializer_field_class = field_mapping[pk_model_field]
+        return pk_serializer_field_class()
 
     def extract_attributes(self, fields, ChildSwaggerType, use_references, is_request=None):
         attrs = {}
