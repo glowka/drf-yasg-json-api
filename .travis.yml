@@ -1,18 +1,17 @@
 language: python
 python:
-  - '3.5'
-  - '3.6'
-  - '3.7'
-  - '3.8'
+  - "3.6"
+  - "3.7"
+  - "3.8"
 
 dist: xenial
 
 cache: pip
 
-matrix:
+jobs:
   fast_finish: true
   include:
-    - python: "3.7"
+    - python: 3.7
       env: TOXENV=lint
 
 install:
@@ -27,7 +26,7 @@ script:
 
 after_success:
   - |
-    if [[ -z "$TOXENV" && -z "$PYPI_DEPLOY" ]]; then
+    if [[ "$TOXENV" != "lint" && -z "$PYPI_DEPLOY" ]]; then
       coverage combine || true
       coverage report
       codecov
