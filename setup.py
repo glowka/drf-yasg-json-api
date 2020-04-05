@@ -14,6 +14,7 @@ with open('requirements/base.txt') as req:
 
 
 setup(
+    use_scm_version=True,
     name='drf-yasg-json-api',
     packages=find_packages(),
     include_package_data=True,
@@ -28,7 +29,7 @@ setup(
     author_email='',
     keywords='drf django django-rest-framework schema swagger openapi codegen swagger-codegen '
              'documentation drf-yasg django-rest-swagger drf-openapi json-api',
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
@@ -41,6 +42,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Framework :: Django',
+        'Framework :: Django :: 1.11',
         'Framework :: Django :: 2.0',
         'Framework :: Django :: 2.1',
         'Framework :: Django :: 2.2',

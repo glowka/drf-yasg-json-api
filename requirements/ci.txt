@@ -1,3 +1,4 @@
 tox-travis==0.12
 tox==3.14.6
 codecov==2.0.16
+setuptools-scm>=3.0.3

@@ -9,19 +9,18 @@ Automated generation of real Swagger/OpenAPI 2.0 schemas for **JSON API** Django
 
 #### Compatible with
 
-- Django REST Framework JSON API: 2.4-2.8, 3.0, 3.1
-- Drf-yasg: 1.4, 1.5, 1.6, 1.7.0, 1.7.1
+- Django REST Framework JSON API: `2.4-2.8, 3.0, 3.1`
+- Drf-yasg: `1.4, 1.5, 1.6, 1.7.0, 1.7.1`
 
 
-- Django REST Framework: 3.7, 3.8, 3.9, 3.10, 3.11
-- Django: 2.0, 2.1, 2.2, 3.0
-- Python: 3.5-3.8
+- Django REST Framework: `3.7, 3.8, 3.9, 3.10, 3.11`
+- Django: `2.0, 2.1, 2.2, 3.0`
+- Python: `3.5-3.8`
 
 ### Installation
 
 ```
 pip install -U drf_yasg_json_api
-
 ```
 
 ### Quickstart
