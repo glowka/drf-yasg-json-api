@@ -1,4 +1,4 @@
-include README.rst
+include README.md
 include LICENSE.rst
 include pyproject.toml
 recursive-include requirements *

@@ -6,7 +6,7 @@ import io
 from setuptools import find_packages
 from setuptools import setup
 
-with io.open('README.rst', encoding='utf-8') as readme:
+with io.open('README.md', encoding='utf-8') as readme:
     description = readme.read()
 
 with open('requirements/base.txt') as req:
@@ -24,7 +24,8 @@ setup(
     description='Automated generation of real Swagger/OpenAPI 2.0 schemas for JSON API Django Rest Framework '
                 'endpoints.',
     long_description=description,
-    url='https://github.com/name/drf-yasg-json-api',
+    long_description_content_type='text/markdown',
+    url='https://github.com/glowka/drf-yasg-json-api',
     author='',
     author_email='',
     keywords='drf django django-rest-framework schema swagger openapi codegen swagger-codegen '

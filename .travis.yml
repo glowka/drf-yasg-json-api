@@ -11,16 +11,14 @@ cache: pip
 jobs:
   fast_finish: true
   include:
-    - python: 3.7
+    - python: "3.7"
       env: TOXENV=lint
-
+      after_success: skip
     - stage: publish
-      python: '3.6'
-      before_script:
-        # workaround for Travis' inability to build PEP517 projects; anything added to build-system.requires
-        # will also have to be added here until Travis implements this
-        - pip install setuptools-scm
+      python: "3.7"
+      before_script: skip
       script: skip
+      after_success: echo "Success"
       env: PYPI_DEPLOY=true
       deploy:
         provider: pypi
@@ -34,7 +32,6 @@ jobs:
 install:
   - pip install -r requirements/ci.txt
 
-
 before_script:
   - coverage erase || true
 
@@ -42,12 +39,9 @@ script:
   - tox
 
 after_success:
-  - |
-    if [[ "$TOXENV" != "lint" && -z "$PYPI_DEPLOY" ]]; then
-      coverage combine || true
-      coverage report
-      codecov
-    fi
+  - coverage combine || true
+  - coverage report
+  - codecov
 
 stages:
   - test

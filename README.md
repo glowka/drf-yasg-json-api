@@ -51,10 +51,10 @@ SWAGGER_SETTINGS = {
 }
 ```
 
-Apply following changes
+Apply following changes:
 ```
 SWAGGER_SETTINGS = {
-    'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg_json_api.view_inspectors.SwaggerJSONAPISchema',  # Replaces drf_yasg default
+    'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg_json_api.view_inspectors.SwaggerJSONAPISchema',  # Overridden
 
     'DEFAULT_FIELD_INSPECTORS': [
         'drf_yasg_json_api.inspectors.JSONAPIFormatFilter',  # Replaces CamelCaseJSONFilter
