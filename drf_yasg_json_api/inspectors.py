@@ -2,7 +2,6 @@ import copy
 import logging
 
 from collections import OrderedDict
-from typing import Type
 
 from django.db import models
 from django.utils.functional import cached_property
@@ -22,11 +21,18 @@ from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
+from .utils import get_field_by_source
 from .utils import get_related_model
+from .utils import get_serializer_model_primary_key
+from .utils import is_json_api
 from .utils import is_json_api_request
 from .utils import is_json_api_response
 
 logger = logging.getLogger(__name__)
+
+
+class JSONAPIDeclarationError(ValueError):
+    pass
 
 
 class InlineSerializerInspector(inspectors.InlineSerializerInspector):
@@ -56,19 +62,14 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
     def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references,
                                    is_request=None):
         fields = json_api_utils.get_serializer_fields(serializer)
-        if self.method.lower() == 'post' and is_request:
-            id_ = None
-        else:
-            id_ = fields.get('id')
-            if id_ is None and isinstance(serializer, serializers.ModelSerializer):
-                id_ = self.build_id_from_model_pk(serializer)
 
-            if id_ is None:
-                logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
-                    view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
-                ))
+        id_ = self.extract_id_field(fields, serializer)
+        if id_ is None and not (self.method.lower() == 'post' and is_request):
+            logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
+                view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
+            ))
 
-        attributes, req_attributes = self.extract_attributes(fields, ChildSwaggerType, use_references, is_request)
+        attributes, req_attributes = self.extract_attributes(id_, fields, ChildSwaggerType, use_references, is_request)
         relationships, req_relationships = self.extract_relationships(fields, ChildSwaggerType, use_references,
                                                                       is_request)
         links = self.extract_links(fields, ChildSwaggerType, use_references) if not is_request else None
@@ -98,21 +99,38 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             required=required_properties
         )
 
-    def build_id_from_model_pk(self, serializer: serializers.ModelSerializer):
-        field_mapping = serializers.ClassLookupDict(serializers.ModelSerializer.serializer_field_mapping)
-        model_class: Type[models.Model] = serializer.Meta.model
-        pk_model_field = [f for f in model_class._meta.fields if f.primary_key][0]
-        pk_serializer_field_class = field_mapping[pk_model_field]
-        return pk_serializer_field_class()
+    def extract_id_field(self, fields, serializer: serializers.Serializer):
+        # Included in fields and explicitly named "id"
+        if 'id' in fields:
+            serializer_id = fields['id']
+            model_pk = get_serializer_model_primary_key(serializer)
+            if model_pk and model_pk.name != 'id' and get_field_by_source(fields.values(), model_pk.name):
+                raise JSONAPIDeclarationError('if serializer includes primary key it cannot define other field as id')
+            return serializer_id
 
-    def extract_attributes(self, fields, ChildSwaggerType, use_references, is_request=None):
+        if not isinstance(serializer, serializers.ModelSerializer):
+            return None
+
+        # Included in fields, but not as "id", find by model primary key
+        model_pk = get_serializer_model_primary_key(serializer)
+        serializer_id = get_field_by_source(fields.values(), model_pk.name)
+        if serializer_id:
+            return serializer_id
+
+        # Not included in fields, create "temporary" field based on model primary key
+        id_field_class, id_field_kwargs = serializer.build_standard_field('id', model_pk)
+        serializer_id: serializers.Field = id_field_class(**id_field_kwargs, source=model_pk.name)
+        serializer_id.bind('id', copy.deepcopy(serializer))
+        return serializer_id
+
+    def extract_attributes(self, id_field, fields, ChildSwaggerType, use_references, is_request=None):
         attrs = {}
         required_attrs = []
         for field_name, field in fields.items():
             if is_request and field.read_only:
                 continue
             # ID is always provided in the root of JSON API so remove it from attributes
-            if field_name == 'id':
+            if id_field and field_name == id_field.field_name:
                 continue
             # Skip fields with relations
             if isinstance(field, (relations.RelatedField, relations.ManyRelatedField, BaseSerializer)):
@@ -266,10 +284,10 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
     Many related field in pure REST is an array, but here in JSON API it is just single field.
     This single field is used as `id` which is part of an `type` + `id` object which is then put in array.
     """
+
     def field_to_swagger_object(self, field, **kwargs):
 
-        if not isinstance(field.parent, serializers.ManyRelatedField) or \
-                not is_json_api_response(self.view.renderer_classes):
+        if not isinstance(field.parent, serializers.ManyRelatedField) or not is_json_api(self.view):
             return inspectors.NotHandled
 
         parent_serializer = get_parent_serializer(field)
@@ -294,27 +312,25 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
         return inspectors.NotHandled
 
 
-class IDFieldInspector(inspectors.SimpleFieldInspector):
-    def field_to_swagger_object(self, field, **kwargs):
-
-        if not isinstance(field, serializers.IntegerField) or not is_json_api_response(self.view.renderer_classes):
+class IDFieldInspector(inspectors.FieldInspector):
+    def field_to_swagger_object(self, field, swagger_object_type, **kwargs):
+        if not is_json_api(self.view):
             return inspectors.NotHandled
 
         parent_serializer = get_parent_serializer(field)
         serializer_meta = getattr(parent_serializer, 'Meta', None)
         model = getattr(serializer_meta, 'model', None)
-
         if model is None:
             return inspectors.NotHandled
 
-        source = getattr(field, 'source', '') or field.field_name
-
-        # Use source but mean field_name
-        model_field = get_model_field(model, source)
+        field_name = getattr(field, 'source', None) or field.field_name
+        model_field = get_model_field(model, field_name)
+        if model_field is None:
+            return inspectors.NotHandled
 
         if (isinstance(model_field, models.IntegerField) and model_field.primary_key) or \
                 isinstance(model_field, models.AutoField):
-            SwaggerType, ChildSwaggerType = self._get_partial_types(field, **kwargs)
+            SwaggerType, ChildSwaggerType = self._get_partial_types(field, swagger_object_type, **kwargs)
             return SwaggerType(type=openapi.TYPE_STRING, format=openapi.FORMAT_INT32)
 
         return inspectors.NotHandled
@@ -341,7 +357,7 @@ class NameFormatFilter(inspectors.FieldInspector):
                 schema.required = [self.format_string(p) for p in schema.required]
 
     def process_result(self, result, method_name, obj, **kwargs):
-        if isinstance(result, openapi.Schema.OR_REF) and is_json_api_response(self.view.renderer_classes):
+        if isinstance(result, openapi.Schema.OR_REF) and is_json_api(self.view):
             schema = openapi.resolve_ref(result, self.components)
             self.format_schema(schema)
 

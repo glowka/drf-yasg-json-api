@@ -17,7 +17,7 @@ class Member(models.Model):
 
 class Project(models.Model):
     name = models.CharField(max_length=100)
-    users = models.ManyToManyField(Member)
+    members = models.ManyToManyField(Member)
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -39,12 +39,8 @@ def test_non_json_api_serializer():
 
     swagger = generator.get_schema(None, True)
 
-    import pprint
-    import json
-
-    pprint.pprint(json.loads(json.dumps(swagger)))
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
-    assert list(response_schema.keys()) == ['id', 'name', 'users']
+    assert list(response_schema.keys()) == ['id', 'name', 'members']
 
 
 def test_json_api_serializer():
@@ -73,4 +69,53 @@ def test_json_api_serializer():
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
     assert 'relationships' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['users']
+    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+
+
+class OtherMember(models.Model):
+    other_id = models.IntegerField(primary_key=True)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+
+
+class OtherProject(models.Model):
+    other_id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100)
+    members = models.ManyToManyField(OtherMember)
+
+
+class OtherProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OtherProject
+        fields = '__all__'
+
+
+def test_json_api_serializer__other_id():
+
+    class ProjectViewSet(viewsets.ModelViewSet):
+        queryset = OtherProject.objects.all()
+        serializer_class = OtherProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+
+    projects_router = routers.DefaultRouter()
+    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    import pprint
+    import json
+
+    pprint.pprint(json.loads(json.dumps(swagger)))
+    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['id']['type'] == 'string'
+    assert 'type' in response_schema['data']['properties']
+    assert 'attributes' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert 'relationships' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+    members = response_schema['data']['properties']['relationships']['properties']['members']
+    assert members['properties']['data']['items']['properties']['id']['type'] == 'string'
