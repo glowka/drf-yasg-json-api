@@ -5,6 +5,7 @@ from collections import OrderedDict
 from typing import Type
 
 from django.db import models
+from django.utils.functional import cached_property
 from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.inspectors.field import get_model_field
@@ -14,7 +15,6 @@ from rest_framework import relations
 from rest_framework import serializers
 from rest_framework.serializers import BaseSerializer
 from rest_framework.settings import api_settings
-from rest_framework_json_api import django_filters
 from rest_framework_json_api import serializers as dja_serializers
 from rest_framework_json_api import utils as json_api_utils
 from rest_framework_json_api.utils import format_value
@@ -29,7 +29,7 @@ from .utils import is_json_api_response
 logger = logging.getLogger(__name__)
 
 
-class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
+class InlineSerializerInspector(inspectors.InlineSerializerInspector):
 
     def get_schema(self, serializer):
         return self.probe_field_inspectors(serializer, openapi.Schema, self.use_definitions, is_request=False)
@@ -261,7 +261,11 @@ class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
         return is_request is None or is_request
 
 
-class JSONAPIM2MFieldInspector(inspectors.SimpleFieldInspector):
+class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
+    """
+    Many related field in pure REST is an array, but here in JSON API it is just single field.
+    This single field is used as `id` which is part of an `type` + `id` object which is then put in array.
+    """
     def field_to_swagger_object(self, field, **kwargs):
 
         if not isinstance(field.parent, serializers.ManyRelatedField) or \
@@ -290,7 +294,7 @@ class JSONAPIM2MFieldInspector(inspectors.SimpleFieldInspector):
         return inspectors.NotHandled
 
 
-class JSONAPIIDFieldInspector(inspectors.SimpleFieldInspector):
+class IDFieldInspector(inspectors.SimpleFieldInspector):
     def field_to_swagger_object(self, field, **kwargs):
 
         if not isinstance(field, serializers.IntegerField) or not is_json_api_response(self.view.renderer_classes):
@@ -316,7 +320,7 @@ class JSONAPIIDFieldInspector(inspectors.SimpleFieldInspector):
         return inspectors.NotHandled
 
 
-class JSONAPIFormatFilter(inspectors.FieldInspector):
+class NameFormatFilter(inspectors.FieldInspector):
 
     def format_string(self, s):
         return format_value(s)
@@ -344,7 +348,7 @@ class JSONAPIFormatFilter(inspectors.FieldInspector):
         return result
 
 
-class AttributesEnhancingFilter(inspectors.FieldInspector):
+class XPropertiesFilter(inspectors.FieldInspector):
 
     def add_write_only(self, result, obj):
         if obj.write_only:
@@ -367,9 +371,14 @@ class AttributesEnhancingFilter(inspectors.FieldInspector):
         return result
 
 
-class JSONAPIDjangoFilterInspector(inspectors.CoreAPICompatInspector):
+class DjangoFilterInspector(inspectors.CoreAPICompatInspector):
+    @cached_property
+    def django_filters(self):
+        from rest_framework_json_api import django_filters
+        return django_filters
+
     def get_filter_parameters(self, filter_backend):
-        if not isinstance(filter_backend, django_filters.DjangoFilterBackend):
+        if not isinstance(filter_backend, self.django_filters.DjangoFilterBackend):
             return inspectors.NotHandled
         return super().get_filter_parameters(filter_backend)
 
