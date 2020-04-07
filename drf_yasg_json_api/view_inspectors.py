@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
+from drf_yasg import inspectors
 from drf_yasg import openapi
-from drf_yasg.inspectors import SwaggerAutoSchema
 from drf_yasg.utils import filter_none
 from drf_yasg.utils import guess_response_status
 from drf_yasg.utils import is_list_view
@@ -12,7 +12,7 @@ from .utils import is_json_api_request
 from .utils import is_json_api_response
 
 
-class SwaggerJSONAPISchema(SwaggerAutoSchema):
+class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
     def get_request_body_schema(self, serializer):
         schema = self.serializer_to_request_schema(serializer)
         if is_json_api_request(self.get_parser_classes()):

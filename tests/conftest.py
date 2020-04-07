@@ -45,32 +45,6 @@ def pytest_configure(config):
         PASSWORD_HASHERS=(
             'django.contrib.auth.hashers.MD5PasswordHasher',
         ),
-        SWAGGER_SETTINGS={
-            'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg_json_api.view_inspectors.SwaggerJSONAPISchema',
-
-            'DEFAULT_FIELD_INSPECTORS': [
-                'drf_yasg_json_api.inspectors.NameFormatFilter',
-                'drf_yasg.inspectors.RecursiveFieldInspector',
-                'drf_yasg_json_api.inspectors.XPropertiesFilter',
-                'drf_yasg_json_api.inspectors.InlineSerializerInspector',
-                'drf_yasg_json_api.inspectors.IDFieldInspector',
-                'drf_yasg.inspectors.ChoiceFieldInspector',
-                'drf_yasg.inspectors.FileFieldInspector',
-                'drf_yasg.inspectors.DictFieldInspector',
-                'drf_yasg.inspectors.JSONFieldInspector',
-                'drf_yasg.inspectors.HiddenFieldInspector',
-                'drf_yasg_json_api.inspectors.ManyRelatedFieldInspector',
-                'drf_yasg.inspectors.RelatedFieldInspector',
-                'drf_yasg.inspectors.SerializerMethodFieldInspector',
-                'drf_yasg.inspectors.SimpleFieldInspector',
-                'drf_yasg.inspectors.StringDefaultFieldInspector',
-
-            ],
-            'DEFAULT_FILTER_INSPECTORS': [
-                'drf_yasg_json_api.inspectors.DjangoFilterInspector',
-                'drf_yasg.inspectors.CoreAPICompatInspector',
-            ],
-        }
     )
 
     django.setup()

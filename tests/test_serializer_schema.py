@@ -1,3 +1,5 @@
+import drf_yasg.inspectors
+
 from django.db import models
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
@@ -8,7 +10,22 @@ from rest_framework_json_api import parsers
 from rest_framework_json_api import renderers
 from rest_framework_json_api import serializers
 
+import drf_yasg_json_api.inspectors
+
+from drf_yasg_json_api import view_inspectors
 from tests import compatibility
+
+
+class BasicSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
+    field_inspectors = [
+        drf_yasg_json_api.inspectors.NameFormatFilter,
+        drf_yasg_json_api.inspectors.InlineSerializerInspector,
+        drf_yasg_json_api.inspectors.IDFieldInspector,
+        drf_yasg_json_api.inspectors.ManyRelatedFieldInspector,
+        drf_yasg.inspectors.RelatedFieldInspector,
+        drf_yasg.inspectors.SimpleFieldInspector,
+        drf_yasg.inspectors.StringDefaultFieldInspector,
+    ]
 
 
 class Member(models.Model):
@@ -30,6 +47,7 @@ def test_get__fallback_to_rest():
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
         serializer_class = ProjectSerializer
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -53,6 +71,7 @@ def test_get():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -91,6 +110,7 @@ def test_get__included():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -118,6 +138,7 @@ def test_post():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -146,6 +167,7 @@ def test_put():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -186,6 +208,7 @@ def test_get__other_id():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
@@ -217,6 +240,7 @@ def test_get__id_based_on_pk():
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
 
     router = routers.DefaultRouter()
     router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
