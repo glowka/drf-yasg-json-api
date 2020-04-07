@@ -45,6 +45,9 @@ def pytest_configure(config):
         PASSWORD_HASHERS=(
             'django.contrib.auth.hashers.MD5PasswordHasher',
         ),
+        JSON_API_FORMAT_TYPES='dasherize',
+        JSON_API_FORMAT_KEYS='dasherize',
+        JSON_API_PLURALIZE_TYPES=True,
     )
 
     django.setup()

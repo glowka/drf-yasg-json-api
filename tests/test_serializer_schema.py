@@ -19,9 +19,9 @@ from tests import compatibility
 class BasicSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
     field_inspectors = [
         drf_yasg_json_api.inspectors.NameFormatFilter,
-        drf_yasg_json_api.inspectors.InlineSerializerInspector,
-        drf_yasg_json_api.inspectors.IDFieldInspector,
-        drf_yasg_json_api.inspectors.ManyRelatedFieldInspector,
+        drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector,
+        drf_yasg_json_api.inspectors.IDIntegerFieldInspector,
+        drf_yasg_json_api.inspectors.ManyRelatedIDIntegerFieldInspector,
         drf_yasg.inspectors.RelatedFieldInspector,
         drf_yasg.inspectors.SimpleFieldInspector,
         drf_yasg.inspectors.StringDefaultFieldInspector,
@@ -35,6 +35,7 @@ class Member(models.Model):
 
 class Project(models.Model):
     name = models.CharField(max_length=100)
+    archived = models.BooleanField()
     members = models.ManyToManyField(Member)
 
 
@@ -57,7 +58,7 @@ def test_get__fallback_to_rest():
     swagger = generator.get_schema(None, True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
-    assert list(response_schema.keys()) == ['id', 'name', 'members']
+    assert list(response_schema.keys()) == ['id', 'name', 'archived', 'members']
 
 
 def test_get():
@@ -85,7 +86,7 @@ def test_get():
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert 'type' in response_schema['data']['properties']
     assert 'attributes' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
@@ -121,7 +122,7 @@ def test_get__included():
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'included' in response_schema
-    assert 'Member' in response_schema['included']['properties']
+    assert 'members' in response_schema['included']['properties']
     request_parameters_schema = swagger['paths']['/projects/{id}/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'include'
     assert request_parameters_schema[0]['description'].endswith(': members')
@@ -151,7 +152,7 @@ def test_post():
     assert 'id' not in request_body_schema['data']['properties']
     assert 'type' in request_body_schema['data']['properties']
     assert 'attributes' in request_body_schema['data']['properties']
-    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in request_body_schema['data']['properties']
     assert list(request_body_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
@@ -180,7 +181,7 @@ def test_put():
     assert 'id' in request_body_schema['data']['properties']
     assert 'type' in request_body_schema['data']['properties']
     assert 'attributes' in request_body_schema['data']['properties']
-    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in request_body_schema['data']['properties']
     assert list(request_body_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
@@ -194,6 +195,7 @@ class OtherMember(models.Model):
 class OtherProject(models.Model):
     other_id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=100)
+    archived = models.BooleanField()
     members = models.ManyToManyField(OtherMember)
 
 
@@ -222,7 +224,7 @@ def test_get__other_id():
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert 'type' in response_schema['data']['properties']
     assert 'attributes' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
     members = response_schema['data']['properties']['relationships']['properties']['members']
@@ -255,3 +257,101 @@ def test_get__id_based_on_pk():
     assert 'type' in response_schema['data']['properties']
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+
+
+def test_post__strip_read_only_fields():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+            read_only_fields = ['archived', 'members']
+
+    class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
+    assert 'id' not in request_body_schema['data']['properties']
+    assert 'type' in request_body_schema['data']['properties']
+    assert 'attributes' in request_body_schema['data']['properties']
+    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert 'relationships' not in request_body_schema['data']['properties']
+
+
+def test_post__mark_as_required():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+            extra_kwargs = {
+                'name': {'required': True},
+                'archived': {'required': False},
+                'members': {'required': True},
+            }
+
+    class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    from tests.utils import print_swagger
+    print_swagger(swagger)
+
+    request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
+    assert set(request_body_schema['data']['required']) == {'type', 'attributes', 'relationships'}
+    assert request_body_schema['data']['properties']['attributes']['required'] == ['name']
+    assert request_body_schema['data']['properties']['relationships']['required'] == ['members']
+    members_schema = request_body_schema['data']['properties']['relationships']['properties']['members']
+    assert members_schema['required'] == ['data']
+    assert set(members_schema['properties']['data']['items']['required']) == {'type', 'id'}
+
+
+def test_get__strip_write_only():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+            extra_kwargs = {
+                'name': {'write_only': False},
+                'archived': {'write_only': True},
+                'members': {'write_only': True},
+            }
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert 'type' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert 'relationships' not in response_schema['data']['properties']

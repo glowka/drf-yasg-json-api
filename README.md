@@ -20,9 +20,11 @@ This package makes [drf-yasg Yet Another Swagger Generator](https://github.com/a
   - [Extending drg-yasg configuration](#extending-drg-yasg-configuration)
   - [Renderers and parsers](#renderers-and-parsers)
 - [Supported features](#supported-features)
-  - [`data` field – `id`, `type`, `relationships`, `attributes` structure](#data-field--id-type-relationships-attributes-structure)
-  - [`included` field and `include` query param](#included-field-and-include-query-param)
-  - [`filter` query param](#filter-query-param)
+  - [The request/response schema consists of](#the-requestresponse-schema-consists-of)
+    - [`data` field – `id`, `type`, `relationships`, `attributes` structure](#data-field--id-type-relationships-attributes-structure)
+    - [`included` field and `include` query param](#included-field-and-include-query-param)
+    - [`filter` query param](#filter-query-param)
+  - [Stripping `write_only` fields from response and `read_only` from request](#stripping-write_only-fields-from-response-and-read_only-from-request)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -84,7 +86,7 @@ SWAGGER_SETTINGS = {
         'drf_yasg_json_api.inspectors.NameFormatFilter',  # Replaces CamelCaseJSONFilter
         'drf_yasg.inspectors.RecursiveFieldInspector',
         'drf_yasg_json_api.inspectors.XPropertiesFilter',  # Added 
-        'drf_yasg_json_api.inspectors.InlineSerializerInspector',  # Replaces ReferencingSerializerInspector
+        'drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector',  # Replaces ReferencingSerializerInspector
         'drf_yasg_json_api.inspectors.IDFieldInspector',  # Added
         'drf_yasg.inspectors.ChoiceFieldInspector',
         'drf_yasg.inspectors.FileFieldInspector',
@@ -119,9 +121,9 @@ That's it!
 
 Fields and query params extraction follows Django REST framework JSON API.
 
-The request/response schema will consist of:
+#### The request/response schema consists of:
     
-- #### `data` field – `id`, `type`, `relationships`, `attributes` structure
+- ##### `data` field – `id`, `type`, `relationships`, `attributes` structure
 
     Schema based on view's main serializer:
     - `id` – `id` field or other serializer field that matches the model `pk` 
@@ -130,15 +132,24 @@ The request/response schema will consist of:
     - `relationships` – all serializer fields of  `RelatedField` and `ManyRelatedField` class
     - `attributes` – all other serializer fields
 
-- #### `included` field and `include` query param
+- ##### `included` field and `include` query param
    
     Schema based on serializers defined in `included_serializer` attribute of view's main serializer where each one is 
     treated in the same way as view's main serializer (`data` field).
   
-- #### `filter` query param
+- ##### `filter` query param
 
     If view uses `django_filters.DjangoFilterBackend` as filter backend,
     schema of `filter[]` query param will be generated based on view's `filterset_fields` attribute.   
+
+#### Stripping `write_only` fields from response and `read_only` from request
+
+`drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector` strips fields inaccessible in request/response to 
+achieve cleaner view on when each field can be used.
+
+You can revert to traditional `drf-yasg` view of all serializer fields in both response and request by replacing this
+inspector with `drf_yasg_json_api.inspectors.InlineSerializerInspector` 
+
 
 
 [build-status-image]: https://secure.travis-ci.org/glowka/drf-yasg-json-api.svg?branch=master
