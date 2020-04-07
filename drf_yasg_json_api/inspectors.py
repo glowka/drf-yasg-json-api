@@ -77,7 +77,7 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         schema_fields = filter_none(OrderedDict(
             type=SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name),
             id=self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
-            if id_ else None,
+            if id_ and not (is_request and id_.read_only) else None,
             attributes=SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
                                    required=req_attributes)
             if attributes else None,

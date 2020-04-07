@@ -1,7 +1,7 @@
 from django.db import models
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
-from rest_framework import routers
+from rest_framework import routers, mixins
 from rest_framework import viewsets
 from rest_framework_json_api import parsers
 from rest_framework_json_api import renderers
@@ -26,9 +26,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-def test_non_json_api_serializer():
+def test_get__fallback_to_rest():
 
-    class ProjectViewSet(viewsets.ModelViewSet):
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
         serializer_class = ProjectSerializer
 
@@ -43,9 +43,9 @@ def test_non_json_api_serializer():
     assert list(response_schema.keys()) == ['id', 'name', 'members']
 
 
-def test_json_api_serializer():
+def test_get():
 
-    class ProjectViewSet(viewsets.ModelViewSet):
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
@@ -58,10 +58,6 @@ def test_json_api_serializer():
 
     swagger = generator.get_schema(None, True)
 
-    import pprint
-    import json
-
-    pprint.pprint(json.loads(json.dumps(swagger)))
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
@@ -70,6 +66,30 @@ def test_json_api_serializer():
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
     assert 'relationships' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+
+
+def test_post():
+
+    class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+
+    projects_router = routers.DefaultRouter()
+    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
+    assert 'id' not in request_schema['data']['properties']
+    assert 'type' in request_schema['data']['properties']
+    assert 'attributes' in request_schema['data']['properties']
+    assert list(request_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert 'relationships' in request_schema['data']['properties']
+    assert list(request_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
 
 class OtherMember(models.Model):
@@ -90,9 +110,9 @@ class OtherProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-def test_json_api_serializer__other_id():
+def test_get__other_id():
 
-    class ProjectViewSet(viewsets.ModelViewSet):
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = OtherProject.objects.all()
         serializer_class = OtherProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
