@@ -119,7 +119,7 @@ The request/response schema will consist of:
     
 - #### `data` field – `id`, `type`, `relationships`, `attributes` structure
 
-    Schema based on view's serializer:
+    Schema based on view's main serializer:
     - `id` – `id` field or other serializer field that matches the model `pk` field
     - `type` – serializer's model JSON API resource name
     - `relationships` – all serializer fields of  `RelatedField` and `ManyRelatedField` class
@@ -127,8 +127,8 @@ The request/response schema will consist of:
 
 - #### `included` field and `include` query param
    
-    Schema based on serializers defined in view's `included_serializer` attribute where each serializer is treated 
-    in the same way as view's main serializer (`data` field).
+    Schema based on serializers defined in `included_serializer` attribute of view's main serializer where each one is 
+    treated in the same way as view's main serializer (`data` field).
   
 - #### `filter` query param
 

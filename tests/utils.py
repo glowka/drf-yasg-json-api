@@ -1,5 +1,5 @@
-import pprint
 import json
+import pprint
 
 
 def print_swagger(swagger):
