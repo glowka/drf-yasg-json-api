@@ -61,9 +61,10 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
     def build_json_resource_schema(self, serializer, resource_name, SwaggerType, ChildSwaggerType, use_references,
                                    is_request=None):
         fields = json_api_utils.get_serializer_fields(serializer)
+        is_post = self.method.lower() == 'post'
 
         id_ = self.extract_id_field(fields, serializer)
-        if id_ is None and not (self.method.lower() == 'post' and is_request):
+        if id_ is None and not (is_request and is_post):
             logging.warning('{view}.{serializer} does not contain id field as every resource should'.format(
                 view=self.view.__class__.__name__, serializer=serializer.__class__.__name__
             ))
@@ -75,13 +76,12 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
 
         schema_fields = filter_none(OrderedDict(
             type=SwaggerType(type=openapi.TYPE_STRING, pattern=resource_name),
-            id=self.probe_field_inspectors(id_, ChildSwaggerType, use_references)
-            if id_ and not (is_request and id_.read_only) else None,
-            attributes=SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes,
-                                   required=req_attributes)
+            id=None
+            if not id_ or (is_request and is_post)
+            else self.probe_field_inspectors(id_, ChildSwaggerType, use_references),
+            attributes=SwaggerType(type=openapi.TYPE_OBJECT, properties=attributes, required=req_attributes)
             if attributes else None,
-            relationships=SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships,
-                                      required=req_relationships)
+            relationships=SwaggerType(type=openapi.TYPE_OBJECT, properties=relationships, required=req_relationships)
             if relationships else None,
             links=SwaggerType(type=openapi.TYPE_OBJECT, properties=links)
             if links else None

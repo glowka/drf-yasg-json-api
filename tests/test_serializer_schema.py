@@ -135,6 +135,34 @@ def test_post():
     assert list(request_body_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
 
+def test_put():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+
+    class ProjectViewSet(mixins.UpdateModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_body_schema = swagger['paths']['/projects/{id}/']['put']['parameters'][0]['schema']['properties']
+    assert 'id' in request_body_schema['data']['properties']
+    assert 'type' in request_body_schema['data']['properties']
+    assert 'attributes' in request_body_schema['data']['properties']
+    assert list(request_body_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+    assert 'relationships' in request_body_schema['data']['properties']
+    assert list(request_body_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+
+
 class OtherMember(models.Model):
     other_id = models.IntegerField(primary_key=True)
     first_name = models.CharField(max_length=100)
