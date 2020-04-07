@@ -258,13 +258,6 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             if self_field_name in fields and isinstance(fields[self_field_name], serializers.RelatedField) else None
         ))
 
-    def inline_serializer_from_fields(self, fields_dict, sub_serializer=True):
-        attrs = {f_name: copy.deepcopy(field) for f_name, field in fields_dict.items()}
-        serializer = type('Attributes', (serializers.Serializer,), attrs)()
-        if sub_serializer:
-            serializer.bind(field_name='', parent=serializers.Serializer())
-        return serializer
-
     def is_json_api_root_serializer(self, field, is_request=False):
         return field and field.parent is None and isinstance(field, serializers.Serializer) and (
             (not is_request and is_json_api_response(self.view.renderer_classes))
