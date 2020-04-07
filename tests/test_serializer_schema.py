@@ -21,28 +21,20 @@ class Project(models.Model):
     members = models.ManyToManyField(Member)
 
 
-class ProjectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Project
-        fields = '__all__'
-
-
-class MemberSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Member
-        fields = '__all__'
-
-
 def test_get__fallback_to_rest():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
         serializer_class = ProjectSerializer
 
-    projects_router = routers.DefaultRouter()
-    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
 
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
     swagger = generator.get_schema(None, True)
 
@@ -51,6 +43,10 @@ def test_get__fallback_to_rest():
 
 
 def test_get():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -58,10 +54,10 @@ def test_get():
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
 
-    projects_router = routers.DefaultRouter()
-    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
 
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
     swagger = generator.get_schema(None, True)
 
@@ -76,21 +72,30 @@ def test_get():
 
 
 def test_get__included():
-    class IncludedProjectSerializer(ProjectSerializer):
+    class MemberSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Member
+            fields = '__all__'
+
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+
         included_serializers = {
             'members': MemberSerializer,
         }
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
-        serializer_class = IncludedProjectSerializer
+        serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
 
-    projects_router = routers.DefaultRouter()
-    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
 
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
     swagger = generator.get_schema(None, True)
 
@@ -103,6 +108,10 @@ def test_get__included():
 
 
 def test_post():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
 
     class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -110,10 +119,10 @@ def test_post():
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
 
-    projects_router = routers.DefaultRouter()
-    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
 
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
     swagger = generator.get_schema(None, True)
 
@@ -138,24 +147,22 @@ class OtherProject(models.Model):
     members = models.ManyToManyField(OtherMember)
 
 
-class OtherProjectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OtherProject
-        fields = '__all__'
-
-
 def test_get__other_id():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = OtherProject
+            fields = '__all__'
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = OtherProject.objects.all()
-        serializer_class = OtherProjectSerializer
+        serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
 
-    projects_router = routers.DefaultRouter()
-    projects_router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
 
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=projects_router.urls)
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
     swagger = generator.get_schema(None, True)
 
@@ -169,3 +176,30 @@ def test_get__other_id():
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
     members = response_schema['data']['properties']['relationships']['properties']['members']
     assert members['properties']['data']['items']['properties']['id']['type'] == 'string'
+
+
+def test_get__id_based_on_pk():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = OtherProject
+            fields = ['name']
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = OtherProject.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['id']['type'] == 'string'
+    assert 'type' in response_schema['data']['properties']
+    assert 'attributes' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']

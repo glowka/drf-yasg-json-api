@@ -1,4 +1,3 @@
-import copy
 import logging
 
 from collections import OrderedDict
@@ -119,8 +118,11 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
 
         # Not included in fields, create "temporary" field based on model primary key
         id_field_class, id_field_kwargs = serializer.build_standard_field('id', model_pk)
-        serializer_id: serializers.Field = id_field_class(**id_field_kwargs, source=model_pk.name)
-        serializer_id.bind('id', copy.deepcopy(serializer))
+        serializer_id: serializers.Field = id_field_class(**id_field_kwargs,
+                                                          source=model_pk.name if model_pk.name != 'id' else None)
+        # NOTE: emulating binding, this is one-way binding
+        # This field is safe to use and pass anywhere, but it won't be visible from serializer
+        serializer_id.bind('id', serializer)
         return serializer_id
 
     def extract_attributes(self, id_field, fields, ChildSwaggerType, use_references, is_request=None):
