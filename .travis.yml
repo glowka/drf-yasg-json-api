@@ -19,7 +19,6 @@ jobs:
       before_script: skip
       script: skip
       after_success: echo "Success"
-      env: PYPI_DEPLOY=true
       deploy:
         provider: pypi
         user: __token__
