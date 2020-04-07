@@ -45,6 +45,8 @@ pip install -U drf_yasg_json_api
 
 ### Quickstart
 
+First follow [drf-yasg quickstart](https://github.com/axnsan12/drf-yasg#1-quickstart),
+then extend the configuration in following way.
 
 #### Extending drg-yasg configuration
 Assuming you are using drf-yasg configuration like below (which is drf-yasg default):
@@ -111,6 +113,8 @@ JSON API schema of your view's response or request will be generated if you use 
 But since you have already used them to *render* or *parse*, not just to *generate schema* (haven't you?), 
 you probably only need to alter the configuration as described above.    
  
+That's it!
+
 ### Supported features
 
 Fields and query params extraction follows Django REST framework JSON API.
@@ -120,7 +124,8 @@ The request/response schema will consist of:
 - #### `data` field – `id`, `type`, `relationships`, `attributes` structure
 
     Schema based on view's main serializer:
-    - `id` – `id` field or other serializer field that matches the model `pk` field
+    - `id` – `id` field or other serializer field that matches the model `pk` 
+    field or in-the-fly generated serializer field for model `pk`
     - `type` – serializer's model JSON API resource name
     - `relationships` – all serializer fields of  `RelatedField` and `ManyRelatedField` class
     - `attributes` – all other serializer fields
