@@ -89,13 +89,14 @@ SWAGGER_SETTINGS = {
         'drf_yasg.inspectors.RecursiveFieldInspector',
         'drf_yasg_json_api.inspectors.XPropertiesFilter',  # Added 
         'drf_yasg_json_api.inspectors.InlineSerializerSmartInspector',  # Replaces ReferencingSerializerInspector
-        'drf_yasg_json_api.inspectors.IDFieldInspector',  # Added
+        'drf_yasg_json_api.inspectors.IntegerIDFieldInspector',  # Added
         'drf_yasg.inspectors.ChoiceFieldInspector',
         'drf_yasg.inspectors.FileFieldInspector',
         'drf_yasg.inspectors.DictFieldInspector',
         'drf_yasg.inspectors.JSONFieldInspector',
         'drf_yasg.inspectors.HiddenFieldInspector',
-        'drf_yasg_json_api.inspectors.ManyRelatedFieldInspector',  # Added 
+        'drf_yasg_json_api.inspectors.ManyRelatedFieldInspector',  # Added
+        'drf_yasg_json_api.inspectors.IntegerPrimaryKeyRelatedFieldInspector',  # Added 
         'drf_yasg.inspectors.RelatedFieldInspector',
         'drf_yasg.inspectors.SerializerMethodFieldInspector',
         'drf_yasg.inspectors.SimpleFieldInspector',

@@ -1,3 +1,6 @@
+from typing import Optional
+
+from django.db import models
 from rest_framework import serializers
 
 
@@ -48,7 +51,26 @@ def get_field_by_source(fields: list, source):
     return None
 
 
+def get_field_model(field: serializers.Field) -> Optional[models.Model]:
+    field_model = getattr(field, 'model', None)
+    if field_model:
+        return field_model
+
+    try:
+        return field.queryset.model
+    except AttributeError:
+        return None
+
+
 def is_many_related_field(field):
     # Check for child relation attribute covers ManyRelationField as well as other possible cases like
     # hacky SerializerMethodResourceRelatedField
     return getattr(field, 'child_relation', None)
+
+
+def get_field_source(field: serializers.Field):
+    source = field.source or field.field_name
+    # If no source and parent is not serializer it is child_field of other field
+    if not source and not isinstance(field.parent, serializers.BaseSerializer):
+        return field.parent.source or field.parent.field_name
+    return None

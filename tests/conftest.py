@@ -46,8 +46,13 @@ def pytest_configure(config):
             'django.contrib.auth.hashers.MD5PasswordHasher',
         ),
         JSON_API_FORMAT_TYPES='dasherize',
-        JSON_API_FORMAT_KEYS='dasherize',
+        JSON_API_FORMAT_FIELD_NAMES='dasherize',
         JSON_API_PLURALIZE_TYPES=True,
+
+        # For JSON API django-rest-framework-json-api <= 2.8
+        JSON_API_FORMAT_KEYS='dasherize',
+        JSON_API_RELATION_KEYS='dasherize',
+        JSON_API_PLURALIZE_RELATION_TYPE=True,
     )
 
     django.setup()

@@ -7,8 +7,7 @@ class MyModel(models.Model):
     name = models.CharField(max_length=255)
 
 
-class TestNoop:
-    @pytest.mark.django_db
-    def test_noop(self):
-        instance = MyModel(name='qwerty')
-        instance.save()
+@pytest.mark.django_db
+def test_django_models_setup():
+    instance = MyModel(name='qwerty')
+    instance.save()

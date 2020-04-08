@@ -1,4 +1,5 @@
 import drf_yasg.inspectors
+import pytest
 
 from django.db import models
 from drf_yasg import openapi
@@ -23,7 +24,8 @@ class BasicSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
     field_inspectors = [
         drf_yasg_json_api.inspectors.NamesFormatFilter,
         drf_yasg_json_api.inspectors.InlineSerializerSmartInspector,
-        drf_yasg_json_api.inspectors.IDIntegerFieldInspector,
+        drf_yasg_json_api.inspectors.IntegerIDFieldInspector,
+        drf_yasg_json_api.inspectors.IntegerPrimaryKeyRelatedFieldInspector,
         drf_yasg_json_api.inspectors.ManyRelatedFieldInspector,
         drf_yasg.inspectors.RelatedFieldInspector,
         drf_yasg.inspectors.SimpleFieldInspector,
@@ -40,13 +42,14 @@ class Project(models.Model):
     name = models.CharField(max_length=100)
     archived = models.BooleanField()
     members = models.ManyToManyField(Member, related_name='projects')
+    owner_member = models.ForeignKey(Member, on_delete=models.DO_NOTHING)
 
 
 def test_get__fallback_to_rest():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -68,7 +71,7 @@ def test_get():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -94,48 +97,6 @@ def test_get():
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
 
-def test_get__serializer_method_resource():
-    class ProjectSerializer(serializers.ModelSerializer):
-        member = relations.SerializerMethodResourceRelatedField(model=Member, source='get_member', read_only=True)
-        members = relations.SerializerMethodResourceRelatedField(model=Member, many=True,
-                                                                 source='get_members', read_only=True)
-
-        class Meta:
-            model = Project
-            fields = ['name', 'archived', 'member', 'members']
-
-        def get_member(self):
-            pass
-
-        def get_members(self):
-            pass
-
-    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = Project.objects.all()
-        serializer_class = ProjectSerializer
-        renderer_classes = [renderers.JSONRenderer]
-        parser_classes = [parsers.JSONParser]
-        swagger_schema = BasicSwaggerAutoSchema
-
-    router = routers.DefaultRouter()
-    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
-
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
-
-    swagger = generator.get_schema(None, True)
-
-    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
-    assert 'id' in response_schema['data']['properties']
-    assert response_schema['data']['properties']['id']['type'] == 'string'
-    assert 'type' in response_schema['data']['properties']
-    assert 'attributes' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
-    assert 'relationships' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['member', 'members']
-    relationships_schema = response_schema['data']['properties']['relationships']['properties']
-    assert 'items' in relationships_schema['members']['properties']['data']
-
-
 def test_get__included():
     class MemberSerializer(serializers.ModelSerializer):
         class Meta:
@@ -145,7 +106,7 @@ def test_get__included():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
         included_serializers = {
             'members': MemberSerializer,
@@ -168,8 +129,9 @@ def test_get__included():
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'included' in response_schema
     assert 'members' in response_schema['included']['properties']
-    members_schema = response_schema['included']['properties']['members']['properties']
-    assert 'projects' in members_schema['relationships']['properties']
+    included_members_schema = response_schema['included']['properties']['members']['properties']
+    assert 'projects' in included_members_schema['relationships']['properties']
+
     request_parameters_schema = swagger['paths']['/projects/{id}/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'include'
     assert request_parameters_schema[0]['description'].endswith(': members')
@@ -179,7 +141,7 @@ def test_post():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
     class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -208,7 +170,7 @@ def test_put():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
     class ProjectViewSet(mixins.UpdateModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -244,13 +206,14 @@ class OtherProject(models.Model):
     name = models.CharField(max_length=100)
     archived = models.BooleanField()
     members = models.ManyToManyField(OtherMember)
+    owner_member = models.ForeignKey(OtherMember, on_delete=models.DO_NOTHING)
 
 
 def test_get__other_id():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = OtherProject
-            fields = '__all__'
+            fields = ('other_id', 'name', 'archived', 'members', 'owner_member')
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = OtherProject.objects.all()
@@ -273,9 +236,97 @@ def test_get__other_id():
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
-    members = response_schema['data']['properties']['relationships']['properties']['members']
-    assert members['properties']['data']['items']['properties']['id']['type'] == 'string'
+    relationships_schema = response_schema['data']['properties']['relationships']['properties']
+    assert list(relationships_schema.keys()) == ['members', 'owner-member']
+    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['type'] == 'string'
+    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['format'] == 'int32'
+    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['type'] == 'string'
+    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['format'] == 'int32'
+
+
+class OtherProjectWithExtraMemberRelation(OtherProject):
+    @property
+    def one_member(self):
+        return
+
+    @property
+    def many_members(self):
+        return
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    'serializer_field,expect_array', (
+        (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_member', read_only=True),
+         False),
+        (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_members', read_only=True,
+                                                        many=True),
+         True),
+        (relations.ResourceRelatedField(model=Member, source='one_member', read_only=True),
+         False),
+        (relations.ResourceRelatedField(model=Member, source='many_members', read_only=True, many=True),
+         True),
+        (relations.SerializerMethodResourceRelatedField(queryset=OtherMember.objects.all(), source='get_member'),
+         False),
+        # Once again: bug of SerializerMethodResourceRelatedField – currently give args invalid for this field class
+        # (relations.SerializerMethodResourceRelatedField(queryset=OtherMember.objects.all(), source='get_members',
+        #                                                 many=True),
+        #  True),
+        (relations.ResourceRelatedField(queryset=OtherMember.objects.all(), source='one_member'),
+         False),
+        (relations.ResourceRelatedField(queryset=OtherMember.objects.all(), source='many_members', many=True),
+         True),
+    )
+)
+def test_get__manual_related_resource(serializer_field, expect_array):
+    class ProjectSerializer(serializers.ModelSerializer):
+        member_relation = serializer_field
+
+        class Meta:
+            model = OtherProjectWithExtraMemberRelation
+            fields = ['name', 'archived', 'member_relation']
+
+        def get_member(self):
+            pass
+
+        def get_members(self):
+            pass
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = OtherProject.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert 'type' in response_schema['data']['properties']
+    assert 'attributes' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
+    assert 'relationships' in response_schema['data']['properties']
+
+    from tests import utils
+    utils.print_swagger(response_schema)
+
+    relation_schema = response_schema['data']['properties']['relationships']['properties']['member-relation']
+
+    if expect_array:
+        assert 'items' in relation_schema['properties']['data']
+        data_schema = relation_schema['properties']['data']['items']['properties']
+    else:
+        assert 'properties' in relation_schema['properties']['data']
+        data_schema = relation_schema['properties']['data']['properties']
+
+    assert data_schema['id']['type'] == 'string'
+    assert data_schema['id']['format'] == 'int32'
 
 
 def test_get__id_based_on_pk():
@@ -310,7 +361,7 @@ def test_post__strip_read_only_fields():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
             read_only_fields = ['archived', 'members']
 
     class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
@@ -339,7 +390,7 @@ def test_post__mark_as_required():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
             extra_kwargs = {
                 'name': {'required': True},
                 'archived': {'required': False},
@@ -373,7 +424,7 @@ def test_get__strip_write_only():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
             extra_kwargs = {
                 'name': {'write_only': False},
                 'archived': {'write_only': True},
@@ -407,7 +458,7 @@ def test_post__x_properties():
             drf_yasg_json_api.inspectors.NamesFormatFilter,
             drf_yasg_json_api.inspectors.XPropertiesFilter,
             drf_yasg_json_api.inspectors.InlineSerializerInspector,
-            drf_yasg_json_api.inspectors.IDIntegerFieldInspector,
+            drf_yasg_json_api.inspectors.IntegerIDFieldInspector,
             drf_yasg_json_api.inspectors.ManyRelatedFieldInspector,
             drf_yasg.inspectors.RelatedFieldInspector,
             drf_yasg.inspectors.SimpleFieldInspector,
@@ -417,7 +468,7 @@ def test_post__x_properties():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
             extra_kwargs = {
                 'name': {'read_only': True},
                 'archived': {'read_only': True},
@@ -458,7 +509,7 @@ def test_get__filter():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = Project
-            fields = '__all__'
+            fields = ('id', 'name', 'archived', 'members')
 
     class ProjectViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
