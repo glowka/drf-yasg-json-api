@@ -275,7 +275,7 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         return is_request is None or is_request
 
 
-class InlineSerializerStrippingInspector(InlineSerializerInspector):
+class InlineSerializerSmartInspector(InlineSerializerInspector):
     strip_read_fields_from_request = True
     strip_write_fields_from_response = True
 
@@ -347,7 +347,7 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
         return self.probe_field_inspectors(id_field, swagger_object_type, **kwargs)
 
 
-class NameFormatFilter(inspectors.FieldInspector):
+class NamesFormatFilter(inspectors.FieldInspector):
 
     def format_string(self, s):
         return format_value(s)

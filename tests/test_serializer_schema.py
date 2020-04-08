@@ -21,8 +21,8 @@ from tests import compatibility
 
 class BasicSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
     field_inspectors = [
-        drf_yasg_json_api.inspectors.NameFormatFilter,
-        drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector,
+        drf_yasg_json_api.inspectors.NamesFormatFilter,
+        drf_yasg_json_api.inspectors.InlineSerializerSmartInspector,
         drf_yasg_json_api.inspectors.IDIntegerFieldInspector,
         drf_yasg_json_api.inspectors.ManyRelatedFieldInspector,
         drf_yasg.inspectors.RelatedFieldInspector,
@@ -397,7 +397,7 @@ def test_get__strip_write_only():
 def test_post__x_properties():
     class XPropertiesSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
         field_inspectors = [
-            drf_yasg_json_api.inspectors.NameFormatFilter,
+            drf_yasg_json_api.inspectors.NamesFormatFilter,
             drf_yasg_json_api.inspectors.XPropertiesFilter,
             drf_yasg_json_api.inspectors.InlineSerializerInspector,
             drf_yasg_json_api.inspectors.IDIntegerFieldInspector,

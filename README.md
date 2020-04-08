@@ -85,10 +85,10 @@ SWAGGER_SETTINGS = {
     'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg_json_api.view_inspectors.SwaggerAutoSchema',  # Overridden
 
     'DEFAULT_FIELD_INSPECTORS': [
-        'drf_yasg_json_api.inspectors.NameFormatFilter',  # Replaces CamelCaseJSONFilter
+        'drf_yasg_json_api.inspectors.NamesFormatFilter',  # Replaces CamelCaseJSONFilter
         'drf_yasg.inspectors.RecursiveFieldInspector',
         'drf_yasg_json_api.inspectors.XPropertiesFilter',  # Added 
-        'drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector',  # Replaces ReferencingSerializerInspector
+        'drf_yasg_json_api.inspectors.InlineSerializerSmartInspector',  # Replaces ReferencingSerializerInspector
         'drf_yasg_json_api.inspectors.IDFieldInspector',  # Added
         'drf_yasg.inspectors.ChoiceFieldInspector',
         'drf_yasg.inspectors.FileFieldInspector',
@@ -148,7 +148,7 @@ Fields and query params extraction follows Django REST framework JSON API.
 
 ##### Stripping `write_only` fields from response and `read_only` from request
 
-`drf_yasg_json_api.inspectors.InlineSerializerStrippingInspector` strips fields inaccessible in request/response to 
+`drf_yasg_json_api.inspectors.InlineSerializerSmartInspector` strips fields inaccessible in request/response to 
 achieve cleaner view on when each field can be used.
 
 You can revert to traditional `drf-yasg` view of all serializer fields in both response and request by replacing this
