@@ -148,8 +148,8 @@ Fields and query params extraction follows Django REST framework JSON API.
 
 ##### Stripping `write_only` fields from response and `read_only` from request
 
-`drf_yasg_json_api.inspectors.InlineSerializerSmartInspector` strips fields inaccessible in request/response to 
-achieve cleaner view on when each field can be used.
+`drf_yasg_json_api.inspectors.InlineSerializerSmartInspector` strips fields inaccessible in request/response to
+ provide view of fields that are **really** available to use.
 
 You can revert to traditional `drf-yasg` view of all serializer fields in both response and request by replacing this
 inspector with `drf_yasg_json_api.inspectors.InlineSerializerInspector` 
