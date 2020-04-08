@@ -313,9 +313,6 @@ def test_post__mark_as_required():
 
     swagger = generator.get_schema(None, True)
 
-    from tests.utils import print_swagger
-    print_swagger(swagger)
-
     request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
     assert set(request_body_schema['data']['required']) == {'type', 'attributes', 'relationships'}
     assert request_body_schema['data']['properties']['attributes']['required'] == ['name']
@@ -355,3 +352,53 @@ def test_get__strip_write_only():
     assert 'type' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
     assert 'relationships' not in response_schema['data']['properties']
+
+
+def test_post__x_properties():
+    class XPropertiesSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
+        field_inspectors = [
+            drf_yasg_json_api.inspectors.NameFormatFilter,
+            drf_yasg_json_api.inspectors.XPropertiesFilter,
+            drf_yasg_json_api.inspectors.InlineSerializerInspector,
+            drf_yasg_json_api.inspectors.IDIntegerFieldInspector,
+            drf_yasg_json_api.inspectors.ManyRelatedIDIntegerFieldInspector,
+            drf_yasg.inspectors.RelatedFieldInspector,
+            drf_yasg.inspectors.SimpleFieldInspector,
+            drf_yasg.inspectors.StringDefaultFieldInspector,
+        ]
+
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+            extra_kwargs = {
+                'name': {'read_only': True},
+                'archived': {'read_only': True},
+                'members': {'write_only': True},
+            }
+
+    class ProjectViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = XPropertiesSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
+    # TODO: add support for marking whole data/relationships if all children write only
+    # assert 'x-writeOnly' in request_body_schema['data']['properties']['relationships']
+    members_schema = request_body_schema['data']['properties']['relationships']['properties']['members']['properties']
+    assert 'x-writeOnly' in members_schema['data']['items']['properties']['id']
+
+    response_schema = swagger['paths']['/projects/']['post']['responses']['201']['schema']['properties']
+    # TODO: add support for marking whole attributes key read_only if all children read only
+    # assert 'x-readOnly' in response_schema['data']['properties']['attributes']
+    assert 'readOnly' in response_schema['data']['properties']['attributes']['properties']['name']
+    assert 'readOnly' in response_schema['data']['properties']['attributes']['properties']['archived']
