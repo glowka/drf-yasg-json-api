@@ -316,7 +316,7 @@ class IDIntegerFieldInspector(inspectors.FieldInspector):
         return inspectors.NotHandled
 
 
-class ManyRelatedIDIntegerFieldInspector(inspectors.SimpleFieldInspector):
+class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
     """
     Minimum: unwrap ManyRelatedField child relation and pass further for probing.
     Maximum: unwrap and force string type of Integer RelatedID
