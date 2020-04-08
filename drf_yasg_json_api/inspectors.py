@@ -161,9 +161,6 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         relationships = OrderedDict()
         required_relationships = []
         for field_name, field in fields.items():
-            many = False
-            id_field = field
-
             if self.should_strip_from_schema(field, is_request):
                 continue
             # Self url field
@@ -173,23 +170,20 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             if not isinstance(field, (relations.RelatedField, relations.ManyRelatedField, serializers.Serializer)):
                 continue
 
-            # Unpack relation from many field
-            if isinstance(id_field, serializers.ManyRelatedField):
-                id_field = id_field.child_relation
-                many = True
-            resource_name = self.get_resource_name_from_related_id_field(field_name, id_field)
-
             # Produce swagger output
             relation_data_schema = openapi.Schema(**filter_none(OrderedDict(
                 type=openapi.TYPE_OBJECT,
                 properties=OrderedDict(
-                    id=self.probe_field_inspectors(id_field, ChildSwaggerType, use_references),
-                    type=self.build_type_schema(resource_name, read_only=field.read_only),
+                    id=self.probe_field_inspectors(field, ChildSwaggerType, use_references),
+                    type=self.build_type_schema(
+                        self.get_resource_name_from_related_id_field(field_name, field),
+                        read_only=field.read_only
+                    ),
                 ),
                 required=['id', 'type'] if (self.is_request_or_unknown(is_request)) and not field.read_only else None,
             )))
 
-            if many:
+            if isinstance(field, serializers.ManyRelatedField):
                 relation_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=relation_data_schema)
 
             relation_links_schema = self.get_links_from_id_field(field_name, field)
@@ -214,6 +208,8 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         return relationships, (required_relationships or None)
 
     def get_resource_name_from_related_id_field(self, field_name, id_field):
+        id_field = getattr(id_field, 'child_relation', None) or id_field
+
         parent_serializer = get_parent_serializer(id_field)
         if isinstance(id_field, dja_serializers.ResourceRelatedField):
             return id_field.get_resource_type_from_included_serializer()
@@ -286,13 +282,13 @@ class InlineSerializerStrippingInspector(InlineSerializerInspector):
 
 class IDIntegerFieldInspector(inspectors.FieldInspector):
     """
-    Force string type on Integer ID, it is needed for:
-     - Primary Key model field
-     - Integer serializer field named "id"
+    Force string type on Integer ID, it can happen when:
+     - Primary Key of model is Integer
+     - Serializer's field named "id" is Integer
     """
 
     def field_to_swagger_object(self, field, swagger_object_type, **kwargs):
-        if not is_json_api(self.view):
+        if isinstance(field, serializers.ManyRelatedField) or not is_json_api(self.view):
             return inspectors.NotHandled
 
         parent_serializer = get_parent_serializer(field)
@@ -322,36 +318,33 @@ class IDIntegerFieldInspector(inspectors.FieldInspector):
 
 class ManyRelatedIDIntegerFieldInspector(inspectors.SimpleFieldInspector):
     """
-    Many related field in pure REST is an array, but here in JSON API it is just single field.
-    This single field is used as `id` which is part of an `type` + `id` object which is then put in array.
+    Minimum: unwrap ManyRelatedField child relation and pass further for probing.
+    Maximum: unwrap and force string type of Integer RelatedID
     """
 
     def field_to_swagger_object(self, field, swagger_object_type, **kwargs):
-
-        if not isinstance(field.parent, serializers.ManyRelatedField) or not is_json_api(self.view):
+        if not isinstance(field, serializers.ManyRelatedField) or not is_json_api(self.view):
             return inspectors.NotHandled
+
+        id_field = field.child_relation
 
         parent_serializer = get_parent_serializer(field)
         serializer_meta = getattr(parent_serializer, 'Meta', None)
         model = getattr(serializer_meta, 'model', None)
-        if model is None:
-            return inspectors.NotHandled
+        if model is not None:
+            source = getattr(field, 'source', None) or field.field_name
+            field_model = get_related_model(model, source)
+            if field_model is not None:
+                model_field = get_model_field(field_model, 'pk')
+                if isinstance(model_field, (models.IntegerField, models.AutoField)):
+                    SwaggerType, ChildSwaggerType = self._get_partial_types(id_field, swagger_object_type, **kwargs)
+                    return SwaggerType(
+                        type=openapi.TYPE_STRING,
+                        format=openapi.FORMAT_INT64
+                        if isinstance(model_field, models.BigIntegerField) else openapi.FORMAT_INT32
+                    )
 
-        source = getattr(field.parent, 'source', None) or field.parent.field_name
-        field_model = get_related_model(model, source)
-        if field_model is None:
-            return inspectors.NotHandled
-
-        model_field = get_model_field(field_model, 'pk')
-        if isinstance(model_field, (models.IntegerField, models.AutoField)):
-            SwaggerType, ChildSwaggerType = self._get_partial_types(field, swagger_object_type, **kwargs)
-            return SwaggerType(
-                type=openapi.TYPE_STRING,
-                format=openapi.FORMAT_INT64
-                if isinstance(model_field, models.BigIntegerField) else openapi.FORMAT_INT32
-            )
-
-        return inspectors.NotHandled
+        return self.probe_field_inspectors(id_field, **kwargs)
 
 
 class NameFormatFilter(inspectors.FieldInspector):

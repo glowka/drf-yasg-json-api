@@ -6,7 +6,10 @@ from drf_yasg.generators import OpenAPISchemaGenerator
 from rest_framework import mixins
 from rest_framework import routers
 from rest_framework import viewsets
-from rest_framework_json_api import parsers, filters, django_filters
+from rest_framework_json_api import django_filters
+from rest_framework_json_api import filters
+from rest_framework_json_api import parsers
+from rest_framework_json_api import relations
 from rest_framework_json_api import renderers
 from rest_framework_json_api import serializers
 
@@ -66,6 +69,41 @@ def test_get():
         class Meta:
             model = Project
             fields = '__all__'
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['id']['type'] == 'string'
+    assert 'type' in response_schema['data']['properties']
+    assert 'attributes' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
+    assert 'relationships' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+
+
+def test_get__serializer_method_resource():
+    class ProjectSerializer(serializers.ModelSerializer):
+        members = relations.SerializerMethodResourceRelatedField(model=Member, source='get_members', read_only=True)
+
+        class Meta:
+            model = Project
+            fields = ['name', 'archived', 'members']
+
+        def get_members(self):
+            pass
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = Project.objects.all()
@@ -436,4 +474,3 @@ def test_get__filter():
 
     request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'filter[archived]'
-
