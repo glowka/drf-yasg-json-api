@@ -6,7 +6,7 @@ from drf_yasg.generators import OpenAPISchemaGenerator
 from rest_framework import mixins
 from rest_framework import routers
 from rest_framework import viewsets
-from rest_framework_json_api import parsers
+from rest_framework_json_api import parsers, filters, django_filters
 from rest_framework_json_api import renderers
 from rest_framework_json_api import serializers
 
@@ -36,7 +36,7 @@ class Member(models.Model):
 class Project(models.Model):
     name = models.CharField(max_length=100)
     archived = models.BooleanField()
-    members = models.ManyToManyField(Member)
+    members = models.ManyToManyField(Member, related_name='projects')
 
 
 def test_get__fallback_to_rest():
@@ -95,7 +95,7 @@ def test_get__included():
     class MemberSerializer(serializers.ModelSerializer):
         class Meta:
             model = Member
-            fields = '__all__'
+            fields = ['first_name', 'last_name', 'projects']
 
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
@@ -123,6 +123,8 @@ def test_get__included():
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'included' in response_schema
     assert 'members' in response_schema['included']['properties']
+    members_schema = response_schema['included']['properties']['members']['properties']
+    assert 'projects' in members_schema['relationships']['properties']
     request_parameters_schema = swagger['paths']['/projects/{id}/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'include'
     assert request_parameters_schema[0]['description'].endswith(': members')
@@ -402,3 +404,36 @@ def test_post__x_properties():
     # assert 'x-readOnly' in response_schema['data']['properties']['attributes']
     assert 'readOnly' in response_schema['data']['properties']['attributes']['properties']['name']
     assert 'readOnly' in response_schema['data']['properties']['attributes']['properties']['archived']
+
+
+def test_get__filter():
+    class FilterSwaggerAutoSchema(BasicSwaggerAutoSchema):
+        filter_inspectors = [drf_yasg_json_api.inspectors.DjangoFilterInspector]
+
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = '__all__'
+
+    class ProjectViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = FilterSwaggerAutoSchema
+
+        filter_backends = (filters.QueryParameterValidationFilter, django_filters.DjangoFilterBackend)
+        filterset_fields = {
+            'archived': ('exact',),
+        }
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
+    assert request_parameters_schema[0]['name'] == 'filter[archived]'
+

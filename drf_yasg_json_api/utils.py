@@ -23,12 +23,12 @@ def get_related_model(model, source):
     try:
         for attr in source.split('.'):
             descriptor = getattr(descriptor, attr)
-    except AttributeError:
+    except AttributeError:  # pragma: no cover
         return None
 
-    try:
+    try:  # pragma: no cover
         return descriptor.rel.related_model if descriptor.reverse else descriptor.rel.model
-    except Exception:
+    except Exception:  # pragma: no cover
         try:
             return descriptor.field.remote_field.model
         except Exception:
