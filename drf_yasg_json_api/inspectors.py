@@ -344,7 +344,7 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
                         if isinstance(model_field, models.BigIntegerField) else openapi.FORMAT_INT32
                     )
 
-        return self.probe_field_inspectors(id_field, **kwargs)
+        return self.probe_field_inspectors(id_field, swagger_object_type, **kwargs)
 
 
 class NameFormatFilter(inspectors.FieldInspector):
