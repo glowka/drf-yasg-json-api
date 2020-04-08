@@ -27,6 +27,7 @@ from .utils import get_serializer_model_primary_key
 from .utils import is_json_api
 from .utils import is_json_api_request
 from .utils import is_json_api_response
+from .utils import is_many_related_field
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,8 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         relationships = OrderedDict()
         required_relationships = []
         for field_name, field in fields.items():
+            self.maybe_fix_broken_parent_relation(field)
+
             if self.should_strip_from_schema(field, is_request):
                 continue
             # Self url field
@@ -183,7 +186,7 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
                 required=['id', 'type'] if (self.is_request_or_unknown(is_request)) and not field.read_only else None,
             )))
 
-            if isinstance(field, serializers.ManyRelatedField):
+            if is_many_related_field(field):
                 relation_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=relation_data_schema)
 
             relation_links_schema = self.get_links_from_id_field(field_name, field)
@@ -228,7 +231,7 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             this_model = getattr(serializer_meta, 'model', None)
 
             source = getattr(id_field, 'source', '') or id_field.field_name
-            if not source and isinstance(id_field.parent, serializers.ManyRelatedField):
+            if not source and is_many_related_field(id_field.parent):
                 source = getattr(id_field.parent, 'source', '') or id_field.parent.field_name
 
             model = get_related_model(this_model, source)
@@ -274,6 +277,15 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         # evaluate None to True as well
         return is_request is None or is_request
 
+    def maybe_fix_broken_parent_relation(self, candidate_field):
+        """
+        SerializerMethodResourceRelatedField is a bit hacky and breaks field.parent.parent...serializer chain when used
+        with many=True. To avoid multiple exception in random inspectors, we just check every relation if fix is needed.
+        """
+        child_field = getattr(candidate_field, 'child_relation', None)
+        if child_field and not getattr(child_field, 'parent', None):
+            setattr(child_field, 'parent', candidate_field)
+
 
 class InlineSerializerSmartInspector(InlineSerializerInspector):
     strip_read_fields_from_request = True
@@ -288,7 +300,7 @@ class IDIntegerFieldInspector(inspectors.FieldInspector):
     """
 
     def field_to_swagger_object(self, field, swagger_object_type, **kwargs):
-        if isinstance(field, serializers.ManyRelatedField) or not is_json_api(self.view):
+        if is_many_related_field(field) or not is_json_api(self.view):
             return inspectors.NotHandled
 
         parent_serializer = get_parent_serializer(field)
@@ -299,6 +311,7 @@ class IDIntegerFieldInspector(inspectors.FieldInspector):
             model_field = get_model_field(model, field_name)
             if (
                 model_field is not None and
+                isinstance(model_field, models.Field) and  # avoid OneToOneRel and other field like caches
                 model_field.primary_key and
                 isinstance(model_field, (models.IntegerField, models.AutoField))
             ):
@@ -311,7 +324,8 @@ class IDIntegerFieldInspector(inspectors.FieldInspector):
         elif field.field_name == 'id' and isinstance(field, serializers.IntegerField):
             type_info = get_basic_type_info(field)
             SwaggerType, ChildSwaggerType = self._get_partial_types(field, swagger_object_type, **kwargs)
-            return SwaggerType(**type_info, type=openapi.TYPE_STRING)
+            type_info['type'] = openapi.TYPE_STRING
+            return SwaggerType(**type_info)
 
         return inspectors.NotHandled
 
@@ -323,7 +337,7 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
     """
 
     def field_to_swagger_object(self, field, swagger_object_type, **kwargs):
-        if not isinstance(field, serializers.ManyRelatedField) or not is_json_api(self.view):
+        if not is_many_related_field(field) or not is_json_api(self.view):
             return inspectors.NotHandled
 
         id_field = field.child_relation

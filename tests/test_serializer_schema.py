@@ -96,11 +96,16 @@ def test_get():
 
 def test_get__serializer_method_resource():
     class ProjectSerializer(serializers.ModelSerializer):
-        members = relations.SerializerMethodResourceRelatedField(model=Member, source='get_members', read_only=True)
+        member = relations.SerializerMethodResourceRelatedField(model=Member, source='get_member', read_only=True)
+        members = relations.SerializerMethodResourceRelatedField(model=Member, many=True,
+                                                                 source='get_members', read_only=True)
 
         class Meta:
             model = Project
-            fields = ['name', 'archived', 'members']
+            fields = ['name', 'archived', 'member', 'members']
+
+        def get_member(self):
+            pass
 
         def get_members(self):
             pass
@@ -126,7 +131,9 @@ def test_get__serializer_method_resource():
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
-    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+    assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['member', 'members']
+    relationships_schema = response_schema['data']['properties']['relationships']['properties']
+    assert 'items' in relationships_schema['members']['properties']['data']
 
 
 def test_get__included():

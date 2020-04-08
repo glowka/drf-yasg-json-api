@@ -46,3 +46,9 @@ def get_field_by_source(fields: list, source):
         if field.source == source:
             return field
     return None
+
+
+def is_many_related_field(field):
+    # Check for child relation attribute covers ManyRelationField as well as other possible cases like
+    # hacky SerializerMethodResourceRelatedField
+    return getattr(field, 'child_relation', None)
