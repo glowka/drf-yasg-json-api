@@ -198,18 +198,18 @@ def test_put():
     assert list(request_body_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
 
 
-class OtherMember(models.Model):
-    other_id = models.BigIntegerField(primary_key=True)
+class MemberWithCustomID(models.Model):
+    custom_id = models.BigIntegerField(primary_key=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
 
 
-class OtherProject(models.Model):
-    other_id = models.IntegerField(primary_key=True)
+class ProjectWithCustomID(models.Model):
+    custom_id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=100)
     archived = models.BooleanField()
-    members = models.ManyToManyField(OtherMember, related_name='projects')
-    owner_member = models.ForeignKey(OtherMember, on_delete=models.DO_NOTHING, related_name='owned_projects')
+    members = models.ManyToManyField(MemberWithCustomID, related_name='projects')
+    owner_member = models.ForeignKey(MemberWithCustomID, on_delete=models.DO_NOTHING, related_name='owned_projects')
 
 
 @pytest.mark.parametrize(
@@ -224,12 +224,12 @@ def test_get__auto_related_resource(read_only):
     """
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
-            model = OtherProject
-            fields = ('other_id', 'name', 'archived', 'members', 'owner_member')
+            model = ProjectWithCustomID
+            fields = ('custom_id', 'name', 'archived', 'members', 'owner_member')
             read_only_fields = ['members', 'owner_member'] if read_only else []
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = OtherProject.objects.all()
+        queryset = ProjectWithCustomID.objects.all()
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
@@ -242,7 +242,7 @@ def test_get__auto_related_resource(read_only):
 
     swagger = generator.get_schema(None, True)
 
-    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert response_schema['data']['properties']['id']['format'] == 'int32'
@@ -270,12 +270,12 @@ def test_get__auto_related_resource__reverse(read_only):
     """
     class MemberSerializer(serializers.ModelSerializer):
         class Meta:
-            model = OtherMember
-            fields = ('other_id', 'first_name', 'last_name', 'projects', 'owned_projects')
+            model = MemberWithCustomID
+            fields = ('custom_id', 'first_name', 'last_name', 'projects', 'owned_projects')
             read_only_fields = ['projects', 'owned_projects'] if read_only else []
 
     class MemberViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = OtherMember.objects.all()
+        queryset = MemberWithCustomID.objects.all()
         serializer_class = MemberSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
@@ -288,7 +288,7 @@ def test_get__auto_related_resource__reverse(read_only):
 
     swagger = generator.get_schema(None, True)
 
-    response_schema = swagger['paths']['/members/{other_id}/']['get']['responses']['200']['schema']['properties']
+    response_schema = swagger['paths']['/members/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert response_schema['data']['properties']['id']['format'] == 'int64'
@@ -305,7 +305,7 @@ def test_get__auto_related_resource__reverse(read_only):
         'int32'
 
 
-class OtherProjectWithExtraMemberRelation(OtherProject):
+class ProjectWithCustomIDAndExtraProperties(ProjectWithCustomID):
     @property
     def one_member(self):
         return
@@ -317,24 +317,24 @@ class OtherProjectWithExtraMemberRelation(OtherProject):
 
 @pytest.mark.parametrize(
     'serializer_field,expect_array', (
-        (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_member', read_only=True),
+        (relations.SerializerMethodResourceRelatedField(model=MemberWithCustomID, source='get_member', read_only=True),
          False),
-        (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_members', read_only=True,
+        (relations.SerializerMethodResourceRelatedField(model=MemberWithCustomID, source='get_members', read_only=True,
                                                         many=True),
          True),
-        (relations.ResourceRelatedField(model=OtherMember, source='one_member', read_only=True),
+        (relations.ResourceRelatedField(model=MemberWithCustomID, source='one_member', read_only=True),
          False),
-        (relations.ResourceRelatedField(model=OtherMember, source='many_members', read_only=True, many=True),
+        (relations.ResourceRelatedField(model=MemberWithCustomID, source='many_members', read_only=True, many=True),
          True),
-        (relations.SerializerMethodResourceRelatedField(queryset=OtherMember.objects.all(), source='get_member'),
+        (relations.SerializerMethodResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='get_member'),
          False),
         # Once again: bug of SerializerMethodResourceRelatedField – currently give args invalid for this field class
-        # (relations.SerializerMethodResourceRelatedField(queryset=OtherMember.objects.all(), source='get_members',
-        #                                                 many=True),
+        # (relations.SerializerMethodResourceRelatedField(queryset=MemberWithCustomID.objects.all(),
+        #                                                 source='get_members', many=True),
         #  True),
-        (relations.ResourceRelatedField(queryset=OtherMember.objects.all(), source='one_member'),
+        (relations.ResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='one_member'),
          False),
-        (relations.ResourceRelatedField(queryset=OtherMember.objects.all(), source='many_members', many=True),
+        (relations.ResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='many_members', many=True),
          True),
     )
 )
@@ -346,7 +346,7 @@ def test_get__manual_related_resource(serializer_field, expect_array):
         member_relation = serializer_field
 
         class Meta:
-            model = OtherProjectWithExtraMemberRelation
+            model = ProjectWithCustomIDAndExtraProperties
             fields = ['name', 'archived', 'member_relation']
 
         def get_member(self):
@@ -356,7 +356,7 @@ def test_get__manual_related_resource(serializer_field, expect_array):
             pass
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = OtherProject.objects.all()
+        queryset = ProjectWithCustomID.objects.all()
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
@@ -369,7 +369,7 @@ def test_get__manual_related_resource(serializer_field, expect_array):
 
     swagger = generator.get_schema(None, True)
 
-    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == "string"
     assert response_schema['data']['properties']['id']['format'] == "int32"
@@ -393,11 +393,11 @@ def test_get__manual_related_resource(serializer_field, expect_array):
 def test_get__id_based_on_pk():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
-            model = OtherProject
+            model = ProjectWithCustomID
             fields = ['name']
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = OtherProject.objects.all()
+        queryset = ProjectWithCustomID.objects.all()
         serializer_class = ProjectSerializer
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
@@ -410,7 +410,7 @@ def test_get__id_based_on_pk():
 
     swagger = generator.get_schema(None, True)
 
-    response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
+    response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert 'type' in response_schema['data']['properties']
