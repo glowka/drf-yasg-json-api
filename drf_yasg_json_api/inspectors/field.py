@@ -3,7 +3,6 @@ import logging
 from collections import OrderedDict
 
 from django.db import models
-from django.utils.functional import cached_property
 from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.inspectors.field import get_model_field
@@ -20,17 +19,27 @@ from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from .utils import get_field_by_source
-from .utils import get_field_model
-from .utils import get_field_source
-from .utils import get_related_model
-from .utils import get_serializer_model_primary_key
-from .utils import is_json_api
-from .utils import is_json_api_request
-from .utils import is_json_api_response
-from .utils import is_many_related_field
+from drf_yasg_json_api.utils import get_field_by_source
+from drf_yasg_json_api.utils import get_field_model
+from drf_yasg_json_api.utils import get_field_source
+from drf_yasg_json_api.utils import get_related_model
+from drf_yasg_json_api.utils import get_serializer_model_primary_key
+from drf_yasg_json_api.utils import is_json_api
+from drf_yasg_json_api.utils import is_json_api_request
+from drf_yasg_json_api.utils import is_json_api_response
+from drf_yasg_json_api.utils import is_many_related_field
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    'InlineSerializerInspector',
+    'InlineSerializerSmartInspector',
+    'IntegerPrimaryKeyRelatedFieldInspector',
+    'IntegerIDFieldInspector',
+    'ManyRelatedFieldInspector',
+    'NamesFormatFilter',
+    'XPropertiesFilter'
+]
 
 
 class JSONAPIDeclarationError(ValueError):
@@ -436,20 +445,3 @@ class XPropertiesFilter(inspectors.FieldInspector):
             self.add_write_only(result, obj)
             self.fix_read_only(result, obj)
         return result
-
-
-class DjangoFilterInspector(inspectors.CoreAPICompatInspector):
-    @cached_property
-    def django_filters(self):
-        from rest_framework_json_api import django_filters
-        return django_filters
-
-    def get_filter_parameters(self, filter_backend):
-        if not isinstance(filter_backend, self.django_filters.DjangoFilterBackend):
-            return inspectors.NotHandled
-        return super().get_filter_parameters(filter_backend)
-
-    def coreapi_field_to_parameter(self, field):
-        parameter = super().coreapi_field_to_parameter(field)
-        parameter.name = f'filter[{parameter.name}]'
-        return parameter

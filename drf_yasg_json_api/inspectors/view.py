@@ -8,8 +8,12 @@ from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
-from .utils import is_json_api_request
-from .utils import is_json_api_response
+from drf_yasg_json_api.utils import is_json_api_request
+from drf_yasg_json_api.utils import is_json_api_response
+
+__all__ = [
+    'SwaggerAutoSchema',
+]
 
 
 class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):

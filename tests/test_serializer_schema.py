@@ -16,11 +16,10 @@ from rest_framework_json_api import serializers
 
 import drf_yasg_json_api.inspectors
 
-from drf_yasg_json_api import view_inspectors
 from tests import compatibility
 
 
-class BasicSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
+class BasicSwaggerAutoSchema(drf_yasg_json_api.inspectors.SwaggerAutoSchema):
     field_inspectors = [
         drf_yasg_json_api.inspectors.NamesFormatFilter,
         drf_yasg_json_api.inspectors.InlineSerializerSmartInspector,
@@ -514,7 +513,7 @@ def test_get__strip_write_only():
 
 
 def test_post__x_properties():
-    class XPropertiesSwaggerAutoSchema(view_inspectors.SwaggerAutoSchema):
+    class XPropertiesSwaggerAutoSchema(drf_yasg_json_api.inspectors.SwaggerAutoSchema):
         field_inspectors = [
             drf_yasg_json_api.inspectors.NamesFormatFilter,
             drf_yasg_json_api.inspectors.XPropertiesFilter,
