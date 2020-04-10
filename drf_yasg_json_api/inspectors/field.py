@@ -367,13 +367,8 @@ class IntegerPrimaryKeyRelatedFieldInspector(IntegerFieldInspectorMixin, inspect
             parent_serializer = get_parent_serializer(field)
             serializer_meta = getattr(parent_serializer, 'Meta', None)
             model = getattr(serializer_meta, 'model', None)
-            try:
-                if model is not None:
-                    related_model = get_related_model(model, source=get_field_source(field))
-
-            except Exception as e:
-                print(e)
-                raise
+            if model is not None:
+                related_model = get_related_model(model, source=get_field_source(field))
 
         if related_model:
             related_model_pk_field = get_model_field(related_model, 'pk')
