@@ -91,6 +91,7 @@ def test_get():
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
     assert 'type' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['type']['pattern'] == 'projects'
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
@@ -99,6 +100,8 @@ def test_get():
 
 def test_get__included():
     class MemberSerializer(serializers.ModelSerializer):
+        # projects = serializers.ResourceRelatedField(many=True, read_only=True)
+
         class Meta:
             model = Member
             fields = ['first_name', 'last_name', 'projects']
@@ -196,7 +199,7 @@ def test_put():
 
 
 class OtherMember(models.Model):
-    other_id = models.IntegerField(primary_key=True)
+    other_id = models.BigIntegerField(primary_key=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
 
@@ -205,15 +208,25 @@ class OtherProject(models.Model):
     other_id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=100)
     archived = models.BooleanField()
-    members = models.ManyToManyField(OtherMember)
-    owner_member = models.ForeignKey(OtherMember, on_delete=models.DO_NOTHING)
+    members = models.ManyToManyField(OtherMember, related_name='projects')
+    owner_member = models.ForeignKey(OtherMember, on_delete=models.DO_NOTHING, related_name='owned_projects')
 
 
-def test_get__other_id():
+@pytest.mark.parametrize(
+    'read_only', (
+        True,
+        False,
+    )
+)
+def test_get__auto_related_resource(read_only):
+    """
+    Correctly select id from non default pk field for both model and related models
+    """
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = OtherProject
             fields = ('other_id', 'name', 'archived', 'members', 'owner_member')
+            read_only_fields = ['members', 'owner_member'] if read_only else []
 
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = OtherProject.objects.all()
@@ -232,6 +245,7 @@ def test_get__other_id():
     response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
     assert response_schema['data']['properties']['id']['type'] == 'string'
+    assert response_schema['data']['properties']['id']['format'] == 'int32'
     assert 'type' in response_schema['data']['properties']
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
@@ -239,9 +253,56 @@ def test_get__other_id():
     relationships_schema = response_schema['data']['properties']['relationships']['properties']
     assert list(relationships_schema.keys()) == ['members', 'owner-member']
     assert relationships_schema['members']['properties']['data']['items']['properties']['id']['type'] == 'string'
-    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['format'] == 'int32'
+    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['format'] == 'int64'
     assert relationships_schema['owner-member']['properties']['data']['properties']['id']['type'] == 'string'
-    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['format'] == 'int32'
+    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['format'] == 'int64'
+
+
+@pytest.mark.parametrize(
+    'read_only', (
+        True,
+        False,
+    )
+)
+def test_get__auto_related_resource__reverse(read_only):
+    """
+    Correctly select id from non default pk field for both model and related models
+    """
+    class MemberSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = OtherMember
+            fields = ('other_id', 'first_name', 'last_name', 'projects', 'owned_projects')
+            read_only_fields = ['projects', 'owned_projects'] if read_only else []
+
+    class MemberViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = OtherMember.objects.all()
+        serializer_class = MemberSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'members', MemberViewSet, **compatibility._basename_or_base_name('members'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/members/{other_id}/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['id']['type'] == 'string'
+    assert response_schema['data']['properties']['id']['format'] == 'int64'
+    assert 'type' in response_schema['data']['properties']
+    assert 'attributes' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['first-name', 'last-name']
+    assert 'relationships' in response_schema['data']['properties']
+    relationships_schema = response_schema['data']['properties']['relationships']['properties']
+    assert list(relationships_schema.keys()) == ['projects', 'owned-projects']
+    assert relationships_schema['projects']['properties']['data']['items']['properties']['id']['type'] == 'string'
+    assert relationships_schema['projects']['properties']['data']['items']['properties']['id']['format'] == 'int32'
+    assert relationships_schema['owned-projects']['properties']['data']['items']['properties']['id']['type'] == 'string'
+    assert relationships_schema['owned-projects']['properties']['data']['items']['properties']['id']['format'] == \
+        'int32'
 
 
 class OtherProjectWithExtraMemberRelation(OtherProject):
@@ -254,7 +315,6 @@ class OtherProjectWithExtraMemberRelation(OtherProject):
         return
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     'serializer_field,expect_array', (
         (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_member', read_only=True),
@@ -262,9 +322,9 @@ class OtherProjectWithExtraMemberRelation(OtherProject):
         (relations.SerializerMethodResourceRelatedField(model=OtherMember, source='get_members', read_only=True,
                                                         many=True),
          True),
-        (relations.ResourceRelatedField(model=Member, source='one_member', read_only=True),
+        (relations.ResourceRelatedField(model=OtherMember, source='one_member', read_only=True),
          False),
-        (relations.ResourceRelatedField(model=Member, source='many_members', read_only=True, many=True),
+        (relations.ResourceRelatedField(model=OtherMember, source='many_members', read_only=True, many=True),
          True),
         (relations.SerializerMethodResourceRelatedField(queryset=OtherMember.objects.all(), source='get_member'),
          False),
@@ -279,6 +339,9 @@ class OtherProjectWithExtraMemberRelation(OtherProject):
     )
 )
 def test_get__manual_related_resource(serializer_field, expect_array):
+    """
+    Support off combinations of related resources fields – they do supply models or don't.
+    """
     class ProjectSerializer(serializers.ModelSerializer):
         member_relation = serializer_field
 
@@ -308,14 +371,12 @@ def test_get__manual_related_resource(serializer_field, expect_array):
 
     response_schema = swagger['paths']['/projects/{other_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
+    assert response_schema['data']['properties']['id']['type'] == "string"
+    assert response_schema['data']['properties']['id']['format'] == "int32"
     assert 'type' in response_schema['data']['properties']
     assert 'attributes' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
-
-    from tests import utils
-    utils.print_swagger(response_schema)
-
     relation_schema = response_schema['data']['properties']['relationships']['properties']['member-relation']
 
     if expect_array:
@@ -326,7 +387,7 @@ def test_get__manual_related_resource(serializer_field, expect_array):
         data_schema = relation_schema['properties']['data']['properties']
 
     assert data_schema['id']['type'] == 'string'
-    assert data_schema['id']['format'] == 'int32'
+    assert data_schema['id']['format'] == 'int64'
 
 
 def test_get__id_based_on_pk():

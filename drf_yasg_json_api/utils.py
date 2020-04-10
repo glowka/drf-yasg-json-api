@@ -1,3 +1,5 @@
+import itertools
+
 from typing import Optional
 
 from django.db import models
@@ -29,18 +31,20 @@ def get_related_model(model, source):
     except AttributeError:  # pragma: no cover
         return None
 
-    try:  # pragma: no cover
-        return descriptor.rel.related_model if descriptor.reverse else descriptor.rel.model
-    except Exception:  # pragma: no cover
-        try:
-            return descriptor.field.remote_field.model
-        except Exception:
-            return None
+    try:
+        is_forward = descriptor.field in itertools.chain(model._meta.fields, model._meta.many_to_many)
+    except AttributeError:  # pragma: no cover
+        return None
+
+    if is_forward:
+        return descriptor.field.related_model
+    else:
+        return descriptor.field.model
 
 
 def get_serializer_model_primary_key(serializer):
     if not isinstance(serializer, serializers.ModelSerializer):
-        return None
+        return None  # pragma: no cover
     return [f for f in serializer.Meta.model._meta.fields if f.primary_key][0]
 
 
@@ -58,12 +62,12 @@ def get_field_model(field: serializers.Field) -> Optional[models.Model]:
 
     try:
         return field.queryset.model
-    except AttributeError:
+    except AttributeError:  # pragma: no cover
         return None
 
 
 def is_many_related_field(field):
-    # Check for child relation attribute covers ManyRelationField as well as other possible cases like
+    # The check for child relation attribute covers ManyRelationField as well as other possible cases like
     # hacky SerializerMethodResourceRelatedField
     return getattr(field, 'child_relation', None)
 
@@ -73,4 +77,4 @@ def get_field_source(field: serializers.Field):
     # If no source and parent is not serializer it is child_field of other field
     if not source and not isinstance(field.parent, serializers.BaseSerializer):
         return field.parent.source or field.parent.field_name
-    return None
+    return source
