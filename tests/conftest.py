@@ -40,6 +40,8 @@ def pytest_configure(config):
             'django.contrib.sessions',
             'django.contrib.sites',
             'django.contrib.staticfiles',
+            'rest_framework',
+            'drf_yasg',
             'tests',
         ),
         PASSWORD_HASHERS=(
@@ -53,6 +55,8 @@ def pytest_configure(config):
         JSON_API_FORMAT_KEYS='dasherize',
         JSON_API_RELATION_KEYS='dasherize',
         JSON_API_PLURALIZE_RELATION_TYPE=True,
+
+        REST_FRAMEWORK={}
     )
 
     django.setup()

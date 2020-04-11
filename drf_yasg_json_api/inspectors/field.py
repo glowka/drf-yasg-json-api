@@ -220,6 +220,16 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
 
         return relationships, (required_relationships or None)
 
+    def extract_links(self, fields, ChildSwaggerType, use_references):
+        self_field_name = api_settings.URL_FIELD_NAME
+
+        print(self_field_name)
+
+        return filter_none(OrderedDict(
+            self=openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI)
+            if self_field_name in fields and isinstance(fields[self_field_name], serializers.RelatedField) else None
+        ))
+
     def get_resource_name_from_related_id_field(self, field_name, id_field):
         id_field = getattr(id_field, 'child_relation', None) or id_field
 
@@ -261,13 +271,6 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
                 links['self'] = openapi.Schema(type=openapi.TYPE_STRING, pattern=openapi.FORMAT_URI, read_only=True)
         return links or None
 
-    def extract_links(self, fields, ChildSwaggerType, use_references):
-        self_field_name = api_settings.URL_FIELD_NAME
-
-        return filter_none(OrderedDict(
-            self=openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI)
-            if self_field_name in fields and isinstance(fields[self_field_name], serializers.RelatedField) else None
-        ))
 
     def is_json_api_root_serializer(self, field, is_request=False):
         return field and field.parent is None and isinstance(field, serializers.Serializer) and (

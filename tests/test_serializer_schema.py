@@ -1,4 +1,5 @@
 import operator
+from unittest import mock
 
 import drf_yasg.inspectors
 import pytest
@@ -557,6 +558,38 @@ def test_get__strip_write_only():
     assert 'type' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
     assert 'relationships' not in response_schema['data']['properties']
+
+
+@mock.patch('rest_framework.settings.api_settings.URL_FIELD_NAME', 'obj_url')
+def test_get__data_links_self():
+
+    class ProjectSerializer(serializers.ModelSerializer):
+        obj_url = serializers.HyperlinkedIdentityField(view_name='any')
+
+        class Meta:
+            model = Project
+            fields = ('id', 'obj_url')
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+
+    assert 'id' in response_schema['data']['properties']
+    assert 'type' in response_schema['data']['properties']
+    assert 'links' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['links']['properties'].keys()) == ['self']
 
 
 def test_post__x_properties():
