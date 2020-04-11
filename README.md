@@ -76,6 +76,10 @@ SWAGGER_SETTINGS = {
     'DEFAULT_FILTER_INSPECTORS': [
         'drf_yasg.inspectors.CoreAPICompatInspector',
     ],
+    'DEFAULT_PAGINATOR_INSPECTORS': [
+        'drf_yasg.inspectors.DjangoRestResponsePagination',
+        'drf_yasg.inspectors.CoreAPICompatInspector',
+    ],
 }
 ```
 
@@ -105,6 +109,11 @@ SWAGGER_SETTINGS = {
     ],
     'DEFAULT_FILTER_INSPECTORS': [
         'drf_yasg_json_api.inspectors.DjangoFilterInspector',  # Added (optional), requires django_filter 
+        'drf_yasg.inspectors.CoreAPICompatInspector',
+    ],
+    'DEFAULT_PAGINATOR_INSPECTORS': [
+        'drf_yasg_json_api.inspectors.DjangoRestResponsePagination',  # Added
+        'drf_yasg.inspectors.DjangoRestResponsePagination',
         'drf_yasg.inspectors.CoreAPICompatInspector',
     ],
 }
@@ -144,6 +153,11 @@ Fields and query params extraction follows Django REST framework JSON API.
 
     If view uses `django_filters.DjangoFilterBackend` as filter backend,
     schema of `filter[]` query param will be generated based on view's `filterset_fields` attribute.   
+  
+- #####  pagination
+
+    If view uses `JsonApiPageNumberPagination` or `JsonApiLimitOffsetPagination` as `pagination_class`, 
+    schema of `links` and `meta`, consistent with those pagination types, will be generated.    
 
 #### Additional
 

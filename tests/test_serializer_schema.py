@@ -1,3 +1,5 @@
+import operator
+
 import drf_yasg.inspectors
 import pytest
 
@@ -9,6 +11,7 @@ from rest_framework import routers
 from rest_framework import viewsets
 from rest_framework_json_api import django_filters
 from rest_framework_json_api import filters
+from rest_framework_json_api import pagination
 from rest_framework_json_api import parsers
 from rest_framework_json_api import relations
 from rest_framework_json_api import renderers
@@ -95,6 +98,50 @@ def test_get():
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+
+
+def test_get__pagination():
+    class SwaggerAutoSchemaWithPagination(BasicSwaggerAutoSchema):
+        paginator_inspectors = [
+            drf_yasg_json_api.inspectors.DjangoRestResponsePagination,
+            drf_yasg.inspectors.DjangoRestResponsePagination,
+            drf_yasg.inspectors.CoreAPICompatInspector,
+        ]
+
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = ('id', 'name', 'archived', 'members')
+
+    class ProjectViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = SwaggerAutoSchemaWithPagination
+        pagination_class = pagination.JsonApiPageNumberPagination
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
+    assert set(map(operator.itemgetter('name'), request_parameters_schema)) == {'page[number]', 'page[size]'}
+
+    response_schema = swagger['paths']['/projects/']['get']['responses']['200']['schema']['properties']
+    assert 'id' in response_schema['data']['items']['properties']
+    assert 'type' in response_schema['data']['items']['properties']
+    assert 'attributes' in response_schema['data']['items']['properties']
+    assert 'relationships' in response_schema['data']['items']['properties']
+    assert 'links' in response_schema
+    assert set(response_schema['links']['properties'].keys()) == {'first', 'next', 'last', 'prev'}
+    assert 'meta' in response_schema
+    assert 'pagination' in response_schema['meta']['properties']
+    pagination_response_schema = response_schema['meta']['properties']['pagination']['properties']
+    assert set(pagination_response_schema.keys()) == {'page', 'pages', 'count'}
 
 
 def test_get__included():

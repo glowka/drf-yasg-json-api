@@ -42,11 +42,13 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
             default_schema = openapi.Schema(
                 type=openapi.TYPE_OBJECT,
-                properties=OrderedDict({
-                    'data': self.get_default_response_data(default_serializer),
-                    'included': self.get_default_response_included(default_serializer)
-                })
+                properties=OrderedDict(
+                    data=self.get_default_response_data(default_serializer),
+                    included=self.get_default_response_included(default_serializer),
+                )
             )
+            if self.should_page():
+                default_schema = self.get_paginated_response(default_schema)
 
         return filter_none(OrderedDict({str(default_status): default_schema}))
 
