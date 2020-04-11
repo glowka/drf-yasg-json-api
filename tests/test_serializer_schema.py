@@ -1,4 +1,5 @@
 import operator
+
 from unittest import mock
 
 import drf_yasg.inspectors
@@ -99,6 +100,9 @@ def test_get():
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name', 'archived']
     assert 'relationships' in response_schema['data']['properties']
     assert list(response_schema['data']['properties']['relationships']['properties'].keys()) == ['members']
+    members_schema = response_schema['data']['properties']['relationships']['properties']['members']['properties']
+    assert members_schema['data']['items']['properties']['id']['type'] == 'string'
+    assert members_schema['data']['items']['properties']['type']['pattern'] == 'members'
 
 
 def test_get__pagination():
@@ -299,10 +303,14 @@ def test_get__auto_related_resource(read_only):
     assert 'relationships' in response_schema['data']['properties']
     relationships_schema = response_schema['data']['properties']['relationships']['properties']
     assert list(relationships_schema.keys()) == ['members', 'owner-member']
-    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['type'] == 'string'
-    assert relationships_schema['members']['properties']['data']['items']['properties']['id']['format'] == 'int64'
-    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['type'] == 'string'
-    assert relationships_schema['owner-member']['properties']['data']['properties']['id']['format'] == 'int64'
+    members_schema = relationships_schema['members']['properties']
+    assert members_schema['data']['items']['properties']['id']['type'] == 'string'
+    assert members_schema['data']['items']['properties']['id']['format'] == 'int64'
+    assert members_schema['data']['items']['properties']['type']['pattern'] == 'member-with-custom-ids'
+    owner_member_schema = relationships_schema['owner-member']['properties']
+    assert owner_member_schema['data']['properties']['id']['type'] == 'string'
+    assert owner_member_schema['data']['properties']['id']['format'] == 'int64'
+    assert owner_member_schema['data']['properties']['type']['pattern'] == 'member-with-custom-ids'
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,7 @@ import itertools
 from typing import Optional
 
 from django.db import models
+from drf_yasg.inspectors.field import get_parent_serializer
 from rest_framework import serializers
 
 
@@ -55,7 +56,20 @@ def get_field_by_source(fields: list, source):
     return None
 
 
-def get_field_model(field: serializers.Field) -> Optional[models.Model]:
+def get_field_related_model(field) -> Optional[models.Model]:
+    # Try extracting directly from field
+    related_model = _get_field_model(field)
+    # If failed try to extract by traversing model and model fields
+    if related_model is None:
+        parent_serializer = get_parent_serializer(field)
+        serializer_meta = getattr(parent_serializer, 'Meta', None)
+        model = getattr(serializer_meta, 'model', None)
+        if model is not None:
+            related_model = get_related_model(model, source=get_field_source(field))
+    return related_model
+
+
+def _get_field_model(field: serializers.Field) -> Optional[models.Model]:
     field_model = getattr(field, 'model', None)
     if field_model:
         return field_model

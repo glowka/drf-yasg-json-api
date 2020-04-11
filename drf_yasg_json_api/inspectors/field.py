@@ -20,9 +20,7 @@ from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
 from drf_yasg_json_api.utils import get_field_by_source
-from drf_yasg_json_api.utils import get_field_model
-from drf_yasg_json_api.utils import get_field_source
-from drf_yasg_json_api.utils import get_related_model
+from drf_yasg_json_api.utils import get_field_related_model
 from drf_yasg_json_api.utils import get_serializer_model_primary_key
 from drf_yasg_json_api.utils import is_json_api
 from drf_yasg_json_api.utils import is_json_api_request
@@ -231,34 +229,24 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
         ))
 
     def get_resource_name_from_related_id_field(self, field_name, id_field):
+        # Unpack ManyRelatedField from many wrapper
         id_field = getattr(id_field, 'child_relation', None) or id_field
 
-        parent_serializer = get_parent_serializer(id_field)
-        if isinstance(id_field, dja_serializers.ResourceRelatedField):
-            return id_field.get_resource_type_from_included_serializer()
-
-        elif isinstance(id_field, serializers.Serializer):
+        # Not very frequent case but different from others
+        if isinstance(id_field, serializers.Serializer):
             return json_api_utils.get_resource_type_from_serializer(id_field)
-
-        # Other kinds of fields
-        if hasattr(id_field, 'model'):
-            model = id_field.model
-        elif hasattr(id_field, 'get_queryset') and id_field.get_queryset():
-            model = id_field.get_queryset().model
-        # If the RelatedField hasn't got a queryset, take model from the serializer and find proper model field
+        # Most cases
         else:
-            serializer_meta = getattr(parent_serializer, 'Meta', None)
-            this_model = getattr(serializer_meta, 'model', None)
+            # Try to get from included serializers
+            parent_serializer = get_parent_serializer(id_field)
+            if isinstance(id_field, dja_serializers.ResourceRelatedField):
+                resource_name = id_field.get_resource_type_from_included_serializer()
+                if resource_name:
+                    return resource_name
 
-            source = getattr(id_field, 'source', '') or id_field.field_name
-            if not source and is_many_related_field(id_field.parent):
-                source = getattr(id_field.parent, 'source', '') or id_field.parent.field_name
-
-            model = get_related_model(this_model, source)
-
-        # Resource name from model
-        if model:
-            return get_resource_type_from_model(model)
+            related_model = get_field_related_model(id_field)
+            if related_model:
+                return get_resource_type_from_model(related_model)
 
         raise ValueError(f"Unable to extract resource name for {parent_serializer}.{field_name} serializer field")
 
@@ -270,7 +258,6 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             if id_field.self_link_view_name is not None:
                 links['self'] = openapi.Schema(type=openapi.TYPE_STRING, pattern=openapi.FORMAT_URI, read_only=True)
         return links or None
-
 
     def is_json_api_root_serializer(self, field, is_request=False):
         return field and field.parent is None and isinstance(field, serializers.Serializer) and (
@@ -363,16 +350,7 @@ class IntegerPrimaryKeyRelatedFieldInspector(IntegerFieldInspectorMixin, inspect
         if is_many_related_field(field):
             return inspectors.NotHandled
 
-        # Try extracting directly from field
-        related_model = get_field_model(field)
-        # If failed try to extract by traversing model and model fields
-        if related_model is None:
-            parent_serializer = get_parent_serializer(field)
-            serializer_meta = getattr(parent_serializer, 'Meta', None)
-            model = getattr(serializer_meta, 'model', None)
-            if model is not None:
-                related_model = get_related_model(model, source=get_field_source(field))
-
+        related_model = get_field_related_model(field)
         if related_model:
             related_model_pk_field = get_model_field(related_model, 'pk')
             if isinstance(related_model_pk_field, (models.IntegerField, models.AutoField)):
