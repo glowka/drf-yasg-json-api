@@ -381,12 +381,6 @@ class ProjectWithCustomIDAndExtraProperties(ProjectWithCustomID):
          False),
         (relations.ResourceRelatedField(model=MemberWithCustomID, source='many_members', read_only=True, many=True),
          True),
-        (relations.SerializerMethodResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='get_member'),
-         False),
-        # Once again: bug of SerializerMethodResourceRelatedField – currently give args invalid for this field class
-        # (relations.SerializerMethodResourceRelatedField(queryset=MemberWithCustomID.objects.all(),
-        #                                                 source='get_members', many=True),
-        #  True),
         (relations.ResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='one_member'),
          False),
         (relations.ResourceRelatedField(queryset=MemberWithCustomID.objects.all(), source='many_members', many=True),
