@@ -58,7 +58,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
             default_data_schema = self.serializer_to_schema(default_serializer) or ''
 
         if is_list_view(self.path, self.method, self.view) and self.method.lower() == 'get':
-            default_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=default_data_schema)
+            default_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(default_data_schema))
 
         return default_data_schema
 
