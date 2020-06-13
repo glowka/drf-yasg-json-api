@@ -221,8 +221,6 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
     def extract_links(self, fields, ChildSwaggerType, use_references):
         self_field_name = api_settings.URL_FIELD_NAME
 
-        print(self_field_name)
-
         return filter_none(OrderedDict(
             self=openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI)
             if self_field_name in fields and isinstance(fields[self_field_name], serializers.RelatedField) else None

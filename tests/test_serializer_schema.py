@@ -47,6 +47,7 @@ class Project(models.Model):
     archived = models.BooleanField()
     members = models.ManyToManyField(Member, related_name='projects')
     owner_member = models.ForeignKey(Member, on_delete=models.DO_NOTHING)
+    sub_projects = models.ManyToManyField('self')
 
 
 def test_get__fallback_to_rest():
@@ -189,6 +190,52 @@ def test_get__included():
     request_parameters_schema = swagger['paths']['/projects/{id}/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'include'
     assert request_parameters_schema[0]['description'].endswith(': members')
+
+
+class IncludedStringPathMemberSerializer(serializers.ModelSerializer):
+    # projects = serializers.ResourceRelatedField(many=True, read_only=True)
+
+    class Meta:
+        model = Member
+        fields = ['first_name', 'last_name', 'projects']
+
+
+def test_get__included__string_path():
+    class ProjectSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Project
+            fields = ('id', 'name', 'archived', 'members')
+
+        included_serializers = {
+            'members': 'tests.test_serializer_schema.IncludedStringPathMemberSerializer',
+            'sub_projects': 'self',
+        }
+
+    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+        queryset = Project.objects.all()
+        serializer_class = ProjectSerializer
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+    assert 'included' in response_schema
+    assert 'members' in response_schema['included']['properties']
+    # For sub-projects
+    assert 'projects' in response_schema['included']['properties']
+    included_members_schema = response_schema['included']['properties']['members']['properties']
+    assert 'projects' in included_members_schema['relationships']['properties']
+
+    request_parameters_schema = swagger['paths']['/projects/{id}/']['get']['parameters']
+    assert request_parameters_schema[0]['name'] == 'include'
+    assert request_parameters_schema[0]['description'].endswith(': sub-projects [recursive], members')
 
 
 def test_post():

@@ -6,6 +6,7 @@ from drf_yasg.utils import filter_none
 from drf_yasg.utils import guess_response_status
 from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
+from rest_framework_json_api.utils import get_included_serializers
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
 from drf_yasg_json_api.utils import is_json_api_request
@@ -63,7 +64,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         return default_data_schema
 
     def get_default_response_included(self, default_serializer):
-        included_paths, included_serializers = self._get_included_paths(default_serializer)
+        included_paths, included_serializers = self._get_included_paths_and_serializers(default_serializer)
         if not included_serializers:
             return None
 
@@ -96,7 +97,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         parameters = []
 
         if hasattr(field, 'included_serializers'):
-            paths, serializers = self._get_included_paths(field)
+            paths, serializers = self._get_included_paths_and_serializers(field)
             parameters.append(openapi.Parameter(
                 type=openapi.TYPE_STRING,
                 in_=openapi.IN_QUERY,
@@ -109,21 +110,24 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
         return parameters
 
-    def _get_included_paths(self, field):
-        candidates = [([], field)]
-        included_paths = []
-        sub_serializers = set()
-        while candidates:
-            path, serializer = candidates.pop()
-            if path:
-                included_paths.append(".".join(path))
-            if not hasattr(serializer, 'included_serializers'):
+    def _get_included_paths_and_serializers(self, field):
+        all_included_paths = []
+        all_included_serializers = set()
+        serializers_to_visit = [([], field)]
+        while serializers_to_visit:
+            path, serializer = serializers_to_visit.pop()
+            # Support recursive reference using "self" keyword
+            if path and serializer is (field if isinstance(field, type) else field.__class__):
+                all_included_paths.append('{path} [recursive]'.format(path=".".join(path)))
                 continue
-            for name, sub_serializer in serializer.included_serializers.items():
-                candidates.append((path + [self._format_key(name)], sub_serializer))
-                sub_serializers.add(sub_serializer)
+            if path:
+                all_included_paths.append(".".join(path))
+            included_serializers = get_included_serializers(serializer)
+            for name, sub_serializer in included_serializers.items():
+                serializers_to_visit.append((path + [self._format_key(name)], sub_serializer))
+                all_included_serializers.add(sub_serializer)
 
-        return included_paths, sub_serializers
+        return all_included_paths, all_included_serializers
 
     def _format_key(self, s):
         return format_value(s)
