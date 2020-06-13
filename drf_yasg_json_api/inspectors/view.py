@@ -1,10 +1,11 @@
+import logging
+
 from collections import OrderedDict
 
 from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.utils import filter_none
 from drf_yasg.utils import guess_response_status
-from drf_yasg.utils import is_list_view
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_included_serializers
 from rest_framework_json_api.utils import get_resource_type_from_serializer
@@ -15,6 +16,8 @@ from drf_yasg_json_api.utils import is_json_api_response
 __all__ = [
     'SwaggerAutoSchema',
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
@@ -54,12 +57,22 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         return filter_none(OrderedDict({str(default_status): default_schema}))
 
     def get_default_response_data(self, default_serializer):
-        default_data_schema = ''
-        if default_serializer and not isinstance(default_serializer, openapi.Schema):
+        if isinstance(default_serializer, openapi.Schema):
+            default_data_schema = default_serializer
+        elif default_serializer:
             default_data_schema = self.serializer_to_schema(default_serializer) or ''
+        else:
+            default_data_schema = ''
 
-        if is_list_view(self.path, self.method, self.view) and self.method.lower() == 'get':
-            default_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=default_data_schema)
+        if self.is_list_view() and self.method.lower() == 'get':
+            if default_data_schema:
+                default_data_schema = openapi.Schema(type=openapi.TYPE_ARRAY, items=default_data_schema)
+            else:
+                logger.warning(
+                    'Missing schema definition for list action of {view_name}, have you defined get_serializer?'.format(
+                        view_name=self.view.__class__.__name__
+                    )
+                )
 
         return default_data_schema
 

@@ -2,6 +2,7 @@
 ------------------
 
 - Add support for string-based `included_serializers`
+- Warn about missing `get_serializer` for view's list action
 
 0.6.0 (2020-04-11)
 ------------------

@@ -5,11 +5,13 @@ from unittest import mock
 import drf_yasg.inspectors
 import pytest
 
+from django.conf.urls import url
 from django.db import models
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
 from rest_framework import mixins
 from rest_framework import routers
+from rest_framework import views
 from rest_framework import viewsets
 from rest_framework_json_api import django_filters
 from rest_framework_json_api import filters
@@ -148,6 +150,29 @@ def test_get__pagination():
     assert 'pagination' in response_schema['meta']['properties']
     pagination_response_schema = response_schema['meta']['properties']['pagination']['properties']
     assert set(pagination_response_schema.keys()) == {'page', 'pages', 'count'}
+
+
+@mock.patch('drf_yasg_json_api.inspectors.view.logger')
+def test_get__list_missing_serializer_warning(logger):
+    class ProjectView(views.APIView):
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = BasicSwaggerAutoSchema
+
+        def get(*args, **kwargs):
+            pass
+
+    urlpatterns = [
+        url('projects/', ProjectView.as_view())
+    ]
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=urlpatterns)
+
+    swagger = generator.get_schema(None, True)
+
+    assert swagger['paths']['/projects/']['get']
+    logger.warning.assert_called_once_with('Missing schema definition for list action of ProjectView, '
+                                           'have you defined get_serializer?')
 
 
 def test_get__included():
