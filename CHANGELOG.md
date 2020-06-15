@@ -1,3 +1,9 @@
+0.7.1 (2020-06-16)
+------------------
+
+- Extend support of string-based `included_serializers` to handle 
+  indirect recursion
+
 0.7.0 (2020-06-13)
 ------------------
 
