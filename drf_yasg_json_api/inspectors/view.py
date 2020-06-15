@@ -123,24 +123,44 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
         return parameters
 
+    MAX_INCLUDED_PATH_DEPTH = 20
+
     def _get_included_paths_and_serializers(self, field):
+        field_cls = field if isinstance(field, type) else field.__class__
         all_included_paths = []
         all_included_serializers = set()
-        serializers_to_visit = [([], field)]
+        serializers_to_visit = [([], [], field_cls)]
         while serializers_to_visit:
-            path, serializer = serializers_to_visit.pop()
-            # Support recursive reference using "self" keyword
-            if path and serializer is (field if isinstance(field, type) else field.__class__):
-                all_included_paths.append('{path} [recursive]'.format(path=".".join(path)))
+            path, parent_serializers, serializer = serializers_to_visit.pop()
+            if len(path) > self.MAX_INCLUDED_PATH_DEPTH:
+                logger.warning('Exceeded max included path limit ({limit}), ignoring longer paths'.format(
+                    limit=self.MAX_INCLUDED_PATH_DEPTH
+                ))
+                continue
+
+            # Support recursive reference using "self" keyword or indirect recursion using lazy string paths
+            if serializer in parent_serializers:
+                if parent_serializers[-1] is serializer:
+                    all_included_paths.append('{path} [recursive]'.format(path=".".join(path)))
+                else:
+                    recursive_path = path[parent_serializers.index(serializer):]
+                    all_included_paths.append('{path} [recursive through: {recursive_path}]'.format(
+                        path=".".join(path), recursive_path=".".join(recursive_path))
+                    )
                 continue
             if path:
                 all_included_paths.append(".".join(path))
             included_serializers = get_included_serializers(serializer)
             for name, sub_serializer in included_serializers.items():
-                serializers_to_visit.append((path + [self._format_key(name)], sub_serializer))
                 all_included_serializers.add(sub_serializer)
+                serializers_to_visit.append((
+                    path + [self._format_key(name)],
+                    parent_serializers + [serializer],
+                    sub_serializer
+                ))
 
         return all_included_paths, all_included_serializers
 
     def _format_key(self, s):
         return format_value(s)
+
