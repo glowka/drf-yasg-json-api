@@ -163,4 +163,3 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
     def _format_key(self, s):
         return format_value(s)
-
