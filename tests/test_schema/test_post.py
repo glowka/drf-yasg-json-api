@@ -34,7 +34,7 @@ def test_post():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
     assert 'id' not in request_body_schema['data']['properties']
@@ -63,7 +63,7 @@ def test_put():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_body_schema = swagger['paths']['/projects/{id}/']['put']['parameters'][0]['schema']['properties']
     assert 'id' in request_body_schema['data']['properties']
@@ -93,7 +93,7 @@ def test_post__strip_read_only_fields():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
     assert 'id' not in request_body_schema['data']['properties']
@@ -126,7 +126,7 @@ def test_post__mark_as_required():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
     assert set(request_body_schema['data']['required']) == {'type', 'attributes', 'relationships'}
@@ -172,7 +172,7 @@ def test_post__x_properties():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_body_schema = swagger['paths']['/projects/']['post']['parameters'][0]['schema']['properties']
     # TODO: add support for marking whole data/relationships if all children write only

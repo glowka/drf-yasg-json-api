@@ -63,7 +63,7 @@ def test_related_resource(read_only):
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
@@ -113,7 +113,7 @@ def test_related_resource__reverse(read_only):
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/members/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
@@ -192,7 +192,7 @@ def test_force_related_resource(serializer_field, expect_array):
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
@@ -233,7 +233,7 @@ def test_id_based_on_pk():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{custom_id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']

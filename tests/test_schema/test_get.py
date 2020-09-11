@@ -26,7 +26,7 @@ from tests import compatibility
 from tests import models as test_models
 
 
-def test_get__fallback_to_rest():
+def test_fallback_to_rest_api():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = test_models.Project
@@ -42,7 +42,7 @@ def test_get__fallback_to_rest():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert list(response_schema.keys()) == ['id', 'name', 'archived', 'members']
@@ -66,7 +66,7 @@ def test_get():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
@@ -82,7 +82,7 @@ def test_get():
     assert members_schema['data']['items']['properties']['type']['pattern'] == 'members'
 
 
-def test_get__pagination():
+def test_pagination():
     class SwaggerAutoSchemaWithPagination(base.BasicSwaggerAutoSchema):
         paginator_inspectors = [
             drf_yasg_json_api.inspectors.DjangoRestResponsePagination,
@@ -108,7 +108,7 @@ def test_get__pagination():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
     assert set(map(operator.itemgetter('name'), request_parameters_schema)) == {'page[number]', 'page[size]'}
@@ -127,7 +127,7 @@ def test_get__pagination():
 
 
 @mock.patch('drf_yasg_json_api.inspectors.view.logger')
-def test_get__list_missing_serializer_warning(logger):
+def test_list_missing_serializer_warning(logger):
     class ProjectView(views.APIView):
         renderer_classes = [renderers.JSONRenderer]
         parser_classes = [parsers.JSONParser]
@@ -142,7 +142,7 @@ def test_get__list_missing_serializer_warning(logger):
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=urlpatterns)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     assert swagger['paths']['/projects/']['get']
     assert len(logger.warning.mock_calls) == 2
@@ -150,7 +150,7 @@ def test_get__list_missing_serializer_warning(logger):
                                       'have you defined get_serializer?')
 
 
-def test_get__strip_write_only():
+def test_strip_write_only():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = test_models.Project
@@ -173,7 +173,7 @@ def test_get__strip_write_only():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'id' in response_schema['data']['properties']
@@ -183,7 +183,7 @@ def test_get__strip_write_only():
 
 
 @mock.patch('rest_framework.settings.api_settings.URL_FIELD_NAME', 'obj_url')
-def test_get__data_links_self():
+def test_data_links_self():
 
     class ProjectSerializer(serializers.ModelSerializer):
         obj_url = serializers.HyperlinkedIdentityField(view_name='any')
@@ -204,7 +204,7 @@ def test_get__data_links_self():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
 
@@ -214,7 +214,7 @@ def test_get__data_links_self():
     assert list(response_schema['data']['properties']['links']['properties'].keys()) == ['self']
 
 
-def test_get__filter():
+def test_filter():
     class FilterSwaggerAutoSchema(base.BasicSwaggerAutoSchema):
         filter_inspectors = [drf_yasg_json_api.inspectors.DjangoFilterInspector]
 
@@ -240,13 +240,13 @@ def test_get__filter():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'filter[archived]'
 
 
-def test_get__non_model():
+def test_non_model():
     class ProjectSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         name = serializers.CharField()
@@ -269,7 +269,7 @@ def test_get__non_model():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'properties' in response_schema['data']
@@ -278,7 +278,7 @@ def test_get__non_model():
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
 
 
-def test_get__non_model_many():
+def test_non_model_many():
     class ProjectSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         name = serializers.CharField()
@@ -301,7 +301,7 @@ def test_get__non_model_many():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/']['get']['responses']['200']['schema']['properties']
     assert 'items' in response_schema['data']
@@ -310,7 +310,7 @@ def test_get__non_model_many():
     assert list(response_schema['data']['items']['properties']['attributes']['properties'].keys()) == ['name']
 
 
-def test_get__non_model__responses_override():
+def test_non_model__responses_override():
     class ProjectSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         name = serializers.CharField()
@@ -330,7 +330,7 @@ def test_get__non_model__responses_override():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'properties' in response_schema['data']
@@ -339,7 +339,7 @@ def test_get__non_model__responses_override():
     assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
 
 
-def test_get__non_model_many__responses_override():
+def test_non_model_many__responses_override():
     class ProjectSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         name = serializers.CharField()
@@ -359,7 +359,7 @@ def test_get__non_model_many__responses_override():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/']['get']['responses']['200']['schema']['properties']
     assert 'items' in response_schema['data']

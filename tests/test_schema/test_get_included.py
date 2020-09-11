@@ -20,7 +20,7 @@ class IncludedStringPathMemberSerializer(serializers.ModelSerializer):
         fields = ['first_name', 'last_name', 'projects']
 
 
-def test_get__included__string_path():
+def test_included__string_path():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:
             model = test_models.Project
@@ -42,7 +42,7 @@ def test_get__included__string_path():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'included' in response_schema
@@ -76,7 +76,7 @@ class IncludedRecursiveProjectSerializer(serializers.ModelSerializer):
     }
 
 
-def test_get__included__recursive():
+def test_included__recursive():
     class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         queryset = test_models.Project.objects.all()
         serializer_class = IncludedRecursiveProjectSerializer
@@ -89,7 +89,7 @@ def test_get__included__recursive():
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
 
-    swagger = generator.get_schema(None, True)
+    swagger = generator.get_schema(request=None, public=True)
 
     response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
     assert 'included' in response_schema
