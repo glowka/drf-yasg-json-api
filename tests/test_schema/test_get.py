@@ -7,6 +7,7 @@ import drf_yasg.inspectors
 from django.conf.urls import url
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins
 from rest_framework import routers
 from rest_framework import views
@@ -144,8 +145,9 @@ def test_get__list_missing_serializer_warning(logger):
     swagger = generator.get_schema(None, True)
 
     assert swagger['paths']['/projects/']['get']
-    logger.warning.assert_called_once_with('Missing schema definition for list action of ProjectView, '
-                                           'have you defined get_serializer?')
+    assert len(logger.warning.mock_calls) == 2
+    logger.warning.assert_called_with('Missing schema definition for list action of ProjectView, '
+                                      'have you defined get_serializer?')
 
 
 def test_get__strip_write_only():
@@ -242,3 +244,125 @@ def test_get__filter():
 
     request_parameters_schema = swagger['paths']['/projects/']['get']['parameters']
     assert request_parameters_schema[0]['name'] == 'filter[archived]'
+
+
+def test_get__non_model():
+    class ProjectSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    class ProjectViewSet(viewsets.ViewSet):
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = base.BasicSwaggerAutoSchema
+        resource_name = 'projects'
+        serializer_class = ProjectSerializer
+
+        def get_serializer(self, *args, **kwargs):
+            return self.serializer_class(*args, **kwargs)
+
+        def retrieve(self, request):
+            pass
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+    assert 'properties' in response_schema['data']
+    assert 'id' in response_schema['data']['properties']
+    assert 'type' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+
+
+def test_get__non_model_many():
+    class ProjectSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    class ProjectViewSet(viewsets.ViewSet):
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = base.BasicSwaggerAutoSchema
+        resource_name = 'projects'
+        serializer_class = ProjectSerializer
+
+        def get_serializer(self, *args, **kwargs):
+            return self.serializer_class(*args, **kwargs)
+
+        def list(self, request):
+            pass
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/']['get']['responses']['200']['schema']['properties']
+    assert 'items' in response_schema['data']
+    assert 'id' in response_schema['data']['items']['properties']
+    assert 'type' in response_schema['data']['items']['properties']
+    assert list(response_schema['data']['items']['properties']['attributes']['properties'].keys()) == ['name']
+
+
+def test_get__non_model__responses_override():
+    class ProjectSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    class ProjectViewSet(viewsets.ViewSet):
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = base.BasicSwaggerAutoSchema
+        resource_name = 'projects'
+
+        @swagger_auto_schema(responses={200: ProjectSerializer()})
+        def retrieve(self, request):
+            pass
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
+    assert 'properties' in response_schema['data']
+    assert 'id' in response_schema['data']['properties']
+    assert 'type' in response_schema['data']['properties']
+    assert list(response_schema['data']['properties']['attributes']['properties'].keys()) == ['name']
+
+
+def test_get__non_model_many__responses_override():
+    class ProjectSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    class ProjectViewSet(viewsets.ViewSet):
+        renderer_classes = [renderers.JSONRenderer]
+        parser_classes = [parsers.JSONParser]
+        swagger_schema = base.BasicSwaggerAutoSchema
+        resource_name = 'projects'
+
+        @swagger_auto_schema(responses={200: ProjectSerializer(many=True)})
+        def list(self, request):
+            pass
+
+    router = routers.DefaultRouter()
+    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
+
+    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
+
+    swagger = generator.get_schema(None, True)
+
+    response_schema = swagger['paths']['/projects/']['get']['responses']['200']['schema']['properties']
+    assert 'items' in response_schema['data']
+    assert 'id' in response_schema['data']['items']['properties']
+    assert 'type' in response_schema['data']['items']['properties']
+    assert list(response_schema['data']['items']['properties']['attributes']['properties'].keys()) == ['name']

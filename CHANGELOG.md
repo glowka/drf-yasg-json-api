@@ -1,3 +1,9 @@
+0.7.2 (2020-XX-XX)
+------------------
+
+- Add support for generating schema from `responses` argument of 
+`swagger_auto_schema`
+
 0.7.1 (2020-06-16)
 ------------------
 

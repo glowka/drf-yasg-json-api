@@ -6,6 +6,8 @@ from drf_yasg import inspectors
 from drf_yasg import openapi
 from drf_yasg.utils import filter_none
 from drf_yasg.utils import guess_response_status
+from rest_framework import serializers
+from rest_framework.status import is_success
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_included_serializers
 from rest_framework_json_api.utils import get_resource_type_from_serializer
@@ -22,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
     def get_request_body_schema(self, serializer):
+        """
+        Hook in to generate request schema from view's serializer OR overridden using `request_body` argument of
+        of `swagger_auto_schema` decorator.
+        """
         schema = self.serializer_to_request_schema(serializer)
         if is_json_api_request(self.get_parser_classes()):
             if schema is not None:
@@ -33,7 +39,47 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
                 )
         return schema
 
+    def get_response_schemas(self, response_serializers):
+        """
+        Hook in to generate response schemas for all pure (not converted to schema) serializers which can be provided
+        using `responses` argument of `swagger_auto_schema` decorator.
+        """
+        if not is_json_api_response(self.get_renderer_classes()):
+            return super().get_response_schemas(response_serializers)
+
+        response_schemas = OrderedDict()
+        for status_code, serializer in response_serializers.items():
+            if is_success(int(status_code)) and isinstance(serializer, serializers.BaseSerializer):
+                response_schemas[status_code] = self.get_overridden_response_schema(serializer)
+            else:
+                response_schemas[status_code] = serializer
+
+        return super().get_response_schemas(response_schemas)
+
+    def get_overridden_response_schema(self, serializer):
+        if getattr(serializer, 'many', False):
+            # Use list's item as main serializer, create new instance to make it look like root serializer not child
+            serializer = serializer.child.__class__()
+            serializer_schema = openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                items=self.serializer_to_schema(serializer)
+            )
+        else:
+            serializer_schema = self.serializer_to_schema(serializer)
+
+        return openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties=OrderedDict(
+                data=serializer_schema,
+                included=self.get_included_schema_for_response(serializer)
+            )
+        )
+
     def get_default_responses(self):
+        """
+        Hook in to generate default response schema from view's serializer. Used only when no overriding response is
+        provided using `responses` argument of `swagger_auto_schema` decorator.
+        """
         if not is_json_api_response(self.get_renderer_classes()):
             return super().get_default_responses()
 
@@ -47,8 +93,8 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
             default_schema = openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties=OrderedDict(
-                    data=self.get_default_response_data(default_serializer),
-                    included=self.get_default_response_included(default_serializer),
+                    data=self.get_data_schema_for_default_response(default_serializer),
+                    included=self.get_included_schema_for_response(default_serializer),
                 )
             )
             if self.should_page():
@@ -56,7 +102,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
         return filter_none(OrderedDict({str(default_status): default_schema}))
 
-    def get_default_response_data(self, default_serializer):
+    def get_data_schema_for_default_response(self, default_serializer):
         if isinstance(default_serializer, openapi.Schema):
             default_data_schema = default_serializer
         elif default_serializer:
@@ -76,8 +122,8 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
 
         return default_data_schema
 
-    def get_default_response_included(self, default_serializer):
-        included_paths, included_serializers = self._get_included_paths_and_serializers(default_serializer)
+    def get_included_schema_for_response(self, serializer):
+        included_paths, included_serializers = self._get_included_paths_and_serializers(serializer)
         if not included_serializers:
             return None
 
@@ -99,18 +145,44 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         )
 
     def get_query_parameters(self):
+        """
+        Hook in to add `include` parameter supported by response serializer.
+
+        Supports generating parameter for success response from `responses` using `swagger_auto_schema` decorator
+        and (of course) for view's main serializer if it's not overridden by decorator.
+
+        """
         if not is_json_api_response(self.get_renderer_classes()):
             return super().get_query_parameters()
 
-        default_serializer = self.get_default_response_serializer()
+        success_response_serializers = [
+            serializer for status_code, serializer in self.get_response_serializers().items()
+            if (
+                is_success(int(status_code)) and
+                isinstance(serializer, serializers.BaseSerializer) and
+                hasattr(serializer, 'included_serializers')
+            )
+        ]
 
-        return super().get_query_parameters() + self.get_query_parameters_included(default_serializer)
+        if not success_response_serializers:
+            response_serializer = self.get_default_response_serializer()
+        else:
+            response_serializer = success_response_serializers[0]
+            if len(success_response_serializers) > 1:
+                logger.warning(
+                    'More than one response serializer for view {view_name} method {method} '
+                    'provides included serializers, falling back to first one'.format(
+                        view_name=self.view.__class__.__name__, method=self.method
+                    )
+                )
 
-    def get_query_parameters_included(self, field):
+        return super().get_query_parameters() + self.get_query_parameters_included(response_serializer)
+
+    def get_query_parameters_included(self, serializer):
         parameters = []
 
-        if hasattr(field, 'included_serializers'):
-            paths, serializers = self._get_included_paths_and_serializers(field)
+        if hasattr(serializer, 'included_serializers'):
+            paths, serializers = self._get_included_paths_and_serializers(serializer)
             parameters.append(openapi.Parameter(
                 type=openapi.TYPE_STRING,
                 in_=openapi.IN_QUERY,

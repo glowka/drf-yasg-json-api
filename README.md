@@ -137,10 +137,16 @@ Fields and query params extraction follows Django REST framework JSON API.
     
 - ##### `data` field with `id`, `type`, `relationships`, `attributes` structure
 
-    Schema based on view's main serializer:
-    - `id` – `id` field or other serializer field that matches the model `pk` 
-    field or in-the-fly generated serializer field for model `pk`
-    - `type` – serializer's model JSON API resource name
+    Schema based on view's main serializer. It accessed through view's `get_serializer` method, 
+    *the same way `drf-yasg` does it*.
+    
+    Use `GenericAPIView` or `APIView` and define `get_serializer` manually. 
+    
+    Fields and their source: 
+    - `id` – `id` field **or** other serializer field that matches the model `pk` 
+    field **or** in-the-fly generated serializer field for model `pk`
+    - `type` – serializer's model JSON API resource name **or** view's resource name,
+     *the same way Django REST framework JSON API does it* 
     - `relationships` – all serializer fields of  `RelatedField` and `ManyRelatedField` class
     - `attributes` – all other serializer fields
 
@@ -160,6 +166,11 @@ Fields and query params extraction follows Django REST framework JSON API.
     schema of `links` and `meta`, consistent with those pagination types, will be generated.    
 
 #### Additional
+
+##### Support for `swagger_auto_schema` decorator of `drf-yasg`
+
+JSON API schema is also generated for success responses (statuses 2XX) defined manually using `responses` argument
+ of `swagger_auto_schema` decorator.   
 
 ##### Stripping `write_only` fields from response and `read_only` from request
 
