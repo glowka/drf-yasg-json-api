@@ -168,7 +168,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
             response_serializer = self.get_default_response_serializer()
         else:
             response_serializer = success_response_serializers[0]
-            if len(success_response_serializers) > 1:
+            if len(success_response_serializers) > 1:  # pragma: no cover
                 logger.warning(
                     'More than one response serializer for view {view_name} method {method} '
                     'provides included serializers, falling back to first one'.format(
@@ -204,7 +204,7 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         serializers_to_visit = [([], [], field_cls)]
         while serializers_to_visit:
             path, parent_serializers, serializer = serializers_to_visit.pop()
-            if len(path) > self.MAX_INCLUDED_PATH_DEPTH:
+            if len(path) > self.MAX_INCLUDED_PATH_DEPTH:  # pragma: no cover
                 logger.warning('Exceeded max included path limit ({limit}), ignoring longer paths'.format(
                     limit=self.MAX_INCLUDED_PATH_DEPTH
                 ))

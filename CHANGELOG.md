@@ -3,6 +3,8 @@
 
 - Add support for generating schema from `responses` argument of 
 `swagger_auto_schema`
+- Add explicit support for `django==3.1` and `djangorestframework-jsonapi==3.2`
+
 
 0.7.1 (2020-06-16)
 ------------------

@@ -5,4 +5,3 @@ pytest==5.4.1
 pytest-cov==2.8.1
 pytest-django==3.8.0
 
-django-filter==2.0
