@@ -1,4 +1,4 @@
-0.8.0 (2020-XX-XX)
+0.8.0 (2020-09-13)
 ------------------
 
 - Add support for generating schema from `responses` argument of 
