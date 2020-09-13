@@ -1,10 +1,16 @@
-0.7.2 (2020-XX-XX)
+0.8.0 (2020-XX-XX)
 ------------------
 
 - Add support for generating schema from `responses` argument of 
 `swagger_auto_schema`
 - Add explicit support for `django==3.1` and `djangorestframework-jsonapi==3.2`
-
+- Deprecate `InlineSerializerInspector` and `InlineSerializerSmartInspector` in favor
+  of `JSONAPISerializerInspector` and `JSONAPISerializerSmartInspector`
+  - use new inspectors to handle JSON API views
+  - to generate docs for **non** JSON API views use `drf-yasg` basic serializer
+    inspectors: `ReferencingSerializerInspector` and `InlineSerializerInspector`
+  - `drf-yasg` serializer inspector put after `drf-yasg-json-api` serializer inspector on the 
+    field inspectors list   
 
 0.7.1 (2020-06-16)
 ------------------

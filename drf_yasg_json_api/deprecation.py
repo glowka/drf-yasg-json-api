@@ -1,0 +1,2 @@
+class DrfYasgJsonApiDeprecationWarning(DeprecationWarning):
+    pass

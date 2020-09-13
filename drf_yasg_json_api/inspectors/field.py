@@ -1,4 +1,5 @@
 import logging
+import warnings
 
 from collections import OrderedDict
 
@@ -19,6 +20,7 @@ from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
+from drf_yasg_json_api.deprecation import DrfYasgJsonApiDeprecationWarning
 from drf_yasg_json_api.utils import get_field_by_source
 from drf_yasg_json_api.utils import get_field_related_model
 from drf_yasg_json_api.utils import get_serializer_model_primary_key
@@ -32,6 +34,8 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'InlineSerializerInspector',
     'InlineSerializerSmartInspector',
+    'JSONAPISerializerInspector',
+    'JSONAPISerializerSmartInspector',
     'IntegerPrimaryKeyRelatedFieldInspector',
     'IntegerIDFieldInspector',
     'ManyRelatedFieldInspector',
@@ -44,9 +48,10 @@ class JSONAPIDeclarationError(ValueError):
     pass
 
 
-class InlineSerializerInspector(inspectors.InlineSerializerInspector):
+class JSONAPISerializerInspector(inspectors.InlineSerializerInspector):
     strip_read_fields_from_request = False
     strip_write_fields_from_response = False
+    handle_json_api_only = True
 
     def get_schema(self, serializer):
         return self.probe_field_inspectors(serializer, openapi.Schema, self.use_definitions, is_request=False)
@@ -60,7 +65,10 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
     def field_to_swagger_object(self, field, swagger_object_type, use_references, included=False, is_request=None,
                                 **kwargs):
         if not self.is_json_api_root_serializer(field, is_request):
-            return super().field_to_swagger_object(field, swagger_object_type, use_references, **kwargs)
+            if self.handle_json_api_only:
+                return inspectors.NotHandled
+            else:
+                return super().field_to_swagger_object(field, swagger_object_type, use_references, **kwargs)
 
         if is_request is None and included:
             is_request = False
@@ -285,9 +293,37 @@ class InlineSerializerInspector(inspectors.InlineSerializerInspector):
             setattr(child_field, 'parent', candidate_field)
 
 
-class InlineSerializerSmartInspector(InlineSerializerInspector):
+class JSONAPISerializerSmartInspector(JSONAPISerializerInspector):
     strip_read_fields_from_request = True
     strip_write_fields_from_response = True
+
+
+class InlineSerializerInspector(JSONAPISerializerInspector):
+    handle_json_api_only = False
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            f'{self.__class__.__name__} is deprecated, use drf_yasg_json_api.inspectors.JSONAPISerializerInspector '
+            'instead to render docs for JSON API views and optionally '
+            'drf_yasg.inspectors.ReferencingSerializerInspector/InlineSerializerInspector to render docs for '
+            'non JSON API views',
+            DrfYasgJsonApiDeprecationWarning
+        )
+        super().__init__(*args, **kwargs)
+
+
+class InlineSerializerSmartInspector(JSONAPISerializerSmartInspector):
+    handle_json_api_only = False
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            f'{self.__class__.__name__} is deprecated, use drf_yasg_json_api.inspectors.JSONAPISerializerSmartInspector'
+            ' instead to render docs for JSON API views and optionally '
+            'drf_yasg.inspectors.ReferencingSerializerInspector/InlineSerializerInspector to render docs for '
+            'non JSON API views',
+            DrfYasgJsonApiDeprecationWarning
+        )
+        super().__init__(*args, **kwargs)
 
 
 class IntegerFieldInspectorMixin:

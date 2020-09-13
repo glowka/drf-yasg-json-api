@@ -26,28 +26,6 @@ from tests import compatibility
 from tests import models as test_models
 
 
-def test_fallback_to_rest_api():
-    class ProjectSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = test_models.Project
-            fields = ('id', 'name', 'archived', 'members')
-
-    class ProjectViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-        queryset = test_models.Project.objects.all()
-        serializer_class = ProjectSerializer
-        swagger_schema = base.BasicSwaggerAutoSchema
-
-    router = routers.DefaultRouter()
-    router.register(r'projects', ProjectViewSet, **compatibility._basename_or_base_name('projects'))
-
-    generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=router.urls)
-
-    swagger = generator.get_schema(request=None, public=True)
-
-    response_schema = swagger['paths']['/projects/{id}/']['get']['responses']['200']['schema']['properties']
-    assert list(response_schema.keys()) == ['id', 'name', 'archived', 'members']
-
-
 def test_get():
     class ProjectSerializer(serializers.ModelSerializer):
         class Meta:

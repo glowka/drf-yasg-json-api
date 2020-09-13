@@ -90,9 +90,10 @@ SWAGGER_SETTINGS = {
 
     'DEFAULT_FIELD_INSPECTORS': [
         'drf_yasg_json_api.inspectors.NamesFormatFilter',  # Replaces CamelCaseJSONFilter
-        'drf_yasg.inspectors.RecursiveFieldInspector',
+        'drf_yasg.inspectors.RecursiveFieldInspector',  
         'drf_yasg_json_api.inspectors.XPropertiesFilter',  # Added 
-        'drf_yasg_json_api.inspectors.InlineSerializerSmartInspector',  # Replaces ReferencingSerializerInspector
+        'drf_yasg_json_api.inspectors.JSONAPISerializerSmartInspector',  # Added
+        'drf_yasg.inspectors.ReferencingSerializerInspector',
         'drf_yasg_json_api.inspectors.IntegerIDFieldInspector',  # Added
         'drf_yasg.inspectors.ChoiceFieldInspector',
         'drf_yasg.inspectors.FileFieldInspector',
@@ -121,8 +122,8 @@ SWAGGER_SETTINGS = {
 
 #### Renderers and parsers
 
-JSON API schema of your view's response or request will be generated if you use `django-rest-framework-json-api`'s  
-`JSONAPIRenderer` or `JSONAPIParser` respectively. 
+JSON API schema of your view's response or request will be generated if you use `django-rest-framework-json-api`'s
+ `JSONAPIRenderer` or `JSONAPIParser` respectively. 
 
 But since you have already used them to *render* or *parse*, not just to *generate schema* (haven't you?), 
 you probably only need to alter the configuration as described above.    
