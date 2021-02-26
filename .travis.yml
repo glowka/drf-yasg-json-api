@@ -3,6 +3,7 @@ python:
   - "3.6"
   - "3.7"
   - "3.8"
+  - "3.9"
 
 dist: xenial
 
@@ -11,11 +12,11 @@ cache: pip
 jobs:
   fast_finish: true
   include:
-    - python: "3.7"
+    - python: "3.8"
       env: TOXENV=lint
       after_success: skip
     - stage: publish
-      python: "3.7"
+      python: "3.8"
       before_script: skip
       script: skip
       after_success: echo "Success"

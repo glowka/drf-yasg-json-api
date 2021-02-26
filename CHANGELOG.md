@@ -6,12 +6,13 @@
 - Add explicit support for `django==3.1` and `djangorestframework-jsonapi==3.2`
 - Deprecate `InlineSerializerInspector` and `InlineSerializerSmartInspector` in favor
   of `JSONAPISerializerInspector` and `JSONAPISerializerSmartInspector`
-  - use new inspectors to handle JSON API views
-  - to generate docs for **non** JSON API views use `drf-yasg` basic serializer
-    inspectors: `ReferencingSerializerInspector` and `InlineSerializerInspector`
-  - `drf-yasg` serializer inspector put after `drf-yasg-json-api` serializer inspector on the 
-    field inspectors list   
-
+  - to generate docs for JSON API views use `JSONAPISerializerInspector` 
+    (or `JSONAPISerializerSmartInspector` to use *smart* feature described in README) 
+  - to generate docs for **non** JSON API views use `drf-yasg` basic `ReferencingSerializerInspector`
+    (or `InlineSerializerInspector` if you're using inline schema)
+  - to generate docs for both JSON API and **non** JSON API use `drf-yasg-json-api` inspector followed
+    by `drf-yasg` inspector, see default configuration in README 
+  
 0.7.1 (2020-06-16)
 ------------------
 
