@@ -1,3 +1,8 @@
+0.8.1 (2021-02-26)
+------------------ 
+- Fix adding x-read-only property by XPropertiesFilter to be compatible with Multipart/FormData parser
+
+
 0.8.0 (2020-09-13)
 ------------------
 
