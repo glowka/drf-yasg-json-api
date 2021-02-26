@@ -444,11 +444,13 @@ class XPropertiesFilter(inspectors.FieldInspector):
         # drf_yasg is very cautious about setting read_only, only leaf nodes are allowed to be read only,
         # but in some cases it goes too far and some leaf nodes cases are omitted too.
         # This workaround fixes obvious cases – types that are always leaf nodes
-        if result.type in (openapi.TYPE_STRING, openapi.TYPE_INTEGER, openapi.TYPE_BOOLEAN) and obj.read_only:
-            result.read_only = True
-        # For non-leaf nodes make read only visible by adding x prefix to avoid conflict with OpenApi 2 validation
-        elif obj.read_only:
-            result.x_read_only = True
+        if obj.read_only:
+            if isinstance(result, openapi.Schema) \
+                    and result.type in (openapi.TYPE_STRING, openapi.TYPE_INTEGER, openapi.TYPE_BOOLEAN):
+                result.read_only = True
+            # For non-leaf nodes make read only visible by adding x prefix to avoid conflict with OpenApi 2 validation
+            else:
+                result.x_read_only = True
 
     def process_result(self, result, method_name, obj, **kwargs):
         if result is not None:
