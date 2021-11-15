@@ -2,4 +2,4 @@ tox-travis==0.12
 tox==3.14.6
 codecov==2.1.7
 setuptools-scm>=3.0.3
-pip==20.3.3
+pip==21.1
