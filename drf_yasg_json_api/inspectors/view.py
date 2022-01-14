@@ -8,6 +8,7 @@ from drf_yasg.utils import filter_none
 from drf_yasg.utils import guess_response_status
 from rest_framework import serializers
 from rest_framework.status import is_success
+from rest_framework_json_api.settings import json_api_settings
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
@@ -234,4 +235,4 @@ class SwaggerAutoSchema(inspectors.SwaggerAutoSchema):
         return all_included_paths, all_included_serializers
 
     def _format_key(self, s):
-        return format_value(s)
+        return format_value(s, json_api_settings.FORMAT_FIELD_NAMES)
