@@ -36,12 +36,12 @@ This package makes [drf-yasg Yet Another Swagger Generator](https://github.com/a
 
 ### Compatibility
 
-- Django REST Framework JSON API: `2.8`, `3.0`, `3.1`, `3.2`, `4.0`
+- Django REST Framework JSON API: `2.8`, `3.0`, `3.1`, `3.2`, `4.0`, `4.1`, `4.2`, `4.3`, `5.0`
 - Drf-yasg: `1.16`, `1.17.0`, `1.17.1`, `1.20`
 
 
-- Django REST Framework: `3.8`, `3.9`, `3.10`, `3.11`, `3.12`
-- Django: `2.0`, `2.1`, `2.2`, `3.0`, `3.1`
+- Django REST Framework: `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`
+- Django: `2.0`, `2.1`, `2.2`, `3.0`, `3.1`, `3.2`
 - Python: `3.6`, `3.7`, `3.8`, `3.9`
 
 ### Installation
