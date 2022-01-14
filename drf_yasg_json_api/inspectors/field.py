@@ -15,6 +15,7 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.settings import api_settings
 from rest_framework_json_api import serializers as dja_serializers
 from rest_framework_json_api import utils as json_api_utils
+from rest_framework_json_api.settings import json_api_settings
 from rest_framework_json_api.utils import format_value
 from rest_framework_json_api.utils import get_resource_name
 from rest_framework_json_api.utils import get_resource_type_from_model
@@ -409,7 +410,7 @@ class ManyRelatedFieldInspector(inspectors.SimpleFieldInspector):
 class NamesFormatFilter(inspectors.FieldInspector):
 
     def format_string(self, s):
-        return format_value(s)
+        return format_value(s, json_api_settings.FORMAT_FIELD_NAMES)
 
     def format_schema(self, schema):
         """Recursively format property names for the given schema according to``JSON_API_FORMAT_KEYS`` setting.
