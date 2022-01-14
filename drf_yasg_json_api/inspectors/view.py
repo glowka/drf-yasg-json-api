@@ -9,9 +9,9 @@ from drf_yasg.utils import guess_response_status
 from rest_framework import serializers
 from rest_framework.status import is_success
 from rest_framework_json_api.utils import format_value
-from rest_framework_json_api.utils import get_included_serializers
 from rest_framework_json_api.utils import get_resource_type_from_serializer
 
+from drf_yasg_json_api.utils import get_included_serializers
 from drf_yasg_json_api.utils import is_json_api_request
 from drf_yasg_json_api.utils import is_json_api_response
 

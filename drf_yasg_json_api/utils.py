@@ -1,8 +1,10 @@
+import copy
 import itertools
 
 from typing import Optional
 
 from django.db import models
+from django.utils.module_loading import import_string
 from drf_yasg.inspectors.field import get_parent_serializer
 from rest_framework import serializers
 
@@ -92,3 +94,22 @@ def get_field_source(field: serializers.Field):
     if not source and not isinstance(field.parent, serializers.BaseSerializer):
         return field.parent.source or field.parent.field_name
     return source
+
+
+def get_included_serializers(serializer):
+    # Extracted from djangorestframework-jsonapi for backwards compatibility
+
+    included_serializers = copy.copy(
+        getattr(serializer, "included_serializers", dict())
+    )
+
+    for name, value in iter(included_serializers.items()):
+        if not isinstance(value, type):
+            if value == "self":
+                included_serializers[name] = (
+                    serializer if isinstance(serializer, type) else serializer.__class__
+                )
+            else:
+                included_serializers[name] = import_string(value)
+
+    return included_serializers
