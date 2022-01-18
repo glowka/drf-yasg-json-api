@@ -1,3 +1,10 @@
+0.9.0 (2022-01-28)
+------------------
+- Add support for `djangorestframework-jsonapi==5.0`
+- Enhance `NamesFormatFilter` to adjust formatting to `FORMAT_FIELD_NAMES` setting from `djangorestframework-jsonapi`
+
+(Thanks to @nikosmichas!)
+
 0.8.1 (2021-02-26)
 ------------------ 
 - Fix adding x-read-only property by XPropertiesFilter to be compatible with Multipart/FormData parser
