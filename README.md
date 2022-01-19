@@ -41,7 +41,7 @@ This package makes [drf-yasg Yet Another Swagger Generator](https://github.com/a
 
 
 - Django REST Framework: `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`
-- Django: `2.0`, `2.1`, `2.2`, `3.0`, `3.1`, `3.2`
+- Django: `2.0`, `2.1`, `2.2`, `3.0`, `3.1`, `3.2`, `4.0`
 - Python: `3.6`, `3.7`, `3.8`, `3.9`
 
 ### Installation
