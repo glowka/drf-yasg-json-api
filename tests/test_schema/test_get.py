@@ -4,7 +4,6 @@ from unittest import mock
 
 import drf_yasg.inspectors
 
-from django.conf.urls import url
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
 from drf_yasg.utils import swagger_auto_schema
@@ -24,6 +23,12 @@ import drf_yasg_json_api.inspectors
 from tests import base
 from tests import compatibility
 from tests import models as test_models
+
+try:
+    from django.urls import path
+except ImportError:
+    # Django 1.11 compatible
+    from django.conf.urls import url as path
 
 
 def test_get():
@@ -115,7 +120,7 @@ def test_list_missing_serializer_warning(logger):
             pass
 
     urlpatterns = [
-        url('projects/', ProjectView.as_view())
+        path('projects/', ProjectView.as_view())
     ]
 
     generator = OpenAPISchemaGenerator(info=openapi.Info(title="", default_version=""), patterns=urlpatterns)
