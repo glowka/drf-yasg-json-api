@@ -1,3 +1,9 @@
+0.9.1 (2022-01-28)
+------------------
+- Waive `django<4.0` requirement after making tests work with Django 4.0
+
+(Thanks to @nikosmichas!)
+
 0.9.0 (2022-01-28)
 ------------------
 - Add support for `djangorestframework-jsonapi==5.0`
