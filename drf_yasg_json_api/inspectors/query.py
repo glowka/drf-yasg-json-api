@@ -36,10 +36,11 @@ class DjangoFilterInspector(inspectors.CoreAPICompatInspector):
 class DjangoRestResponsePagination(inspectors.PaginatorInspector):
 
     def get_paginated_response(self, paginator, response_schema):
-        assert 'data' in response_schema['properties'], "expected data field in response"
-        assert response_schema['properties']['data'].type == openapi.TYPE_ARRAY, "array expected for paged response"
         if not isinstance(paginator, (pagination.JsonApiPageNumberPagination, pagination.JsonApiLimitOffsetPagination)):
             return inspectors.NotHandled
+
+        assert 'data' in response_schema['properties'], "expected data field in response"
+        assert response_schema['properties']['data'].type == openapi.TYPE_ARRAY, "array expected for paged response"
 
         has_page = isinstance(paginator, pagination.JsonApiPageNumberPagination)
         meta_schema = openapi.Schema(
